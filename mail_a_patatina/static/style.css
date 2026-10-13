@@ -1,0 +1,104 @@
+:root {
+  --bg: #f4f1ec;
+  --card: #ffffff;
+  --text: #2b2622;
+  --muted: #7a6f66;
+  --accent: #2b2622;
+  --accent-text: #ffffff;
+  --chip: #ece7e0;
+  --chip-mine: #ffd9cf;
+  --line: #e2dcd4;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #181614;
+    --card: #23201d;
+    --text: #efe9e2;
+    --muted: #a39a91;
+    --accent: #efe9e2;
+    --accent-text: #181614;
+    --chip: #322e2a;
+    --chip-mine: #5a3a31;
+    --line: #3a3530;
+  }
+}
+
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 17px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+a { color: inherit; }
+main { max-width: 640px; margin: 0 auto; padding: 0 16px 48px; }
+
+.top {
+  max-width: 640px; margin: 0 auto; padding: 16px;
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+}
+.brand { font-weight: 700; text-decoration: none; font-size: 19px; display: flex; align-items: center; gap: 8px; }
+.brand img { width: 36px; height: 36px; border-radius: 0; background: none; }
+.top nav { display: flex; gap: 16px; }
+.top nav a { text-decoration: none; color: var(--muted); }
+
+img, video { display: block; width: 100%; height: auto; border-radius: 14px; background: var(--chip); }
+figure { margin: 0; }
+.date { color: var(--muted); font-size: 14px; margin: 12px 0 0; }
+.caption { font-size: 19px; margin: 4px 0 0; white-space: pre-line; }
+
+.card {
+  display: block; text-decoration: none; background: var(--card);
+  border-radius: 14px; margin-bottom: 20px; overflow: hidden;
+}
+.card img { border-radius: 0; }
+.card-body { padding: 4px 16px 14px; }
+.counts { color: var(--muted); font-size: 14px; margin: 8px 0 0; display: flex; gap: 12px; }
+
+.reactions { display: flex; gap: 12px; margin: 16px 0 4px; flex-wrap: wrap; align-items: center; }
+.reactions form { margin: 0; }
+button {
+  font: inherit; cursor: pointer; border: 0; border-radius: 999px;
+  background: var(--accent); color: var(--accent-text); padding: 10px 18px;
+}
+button.react { background: var(--chip); color: var(--text); font-size: 22px; padding: 6px 14px; }
+button.react.mine { background: var(--chip-mine); }
+button.link { background: none; color: var(--muted); padding: 0; font-size: 13px; text-decoration: underline; }
+.who { color: var(--muted); font-size: 14px; margin: 0; }
+.react.static { display: inline-block; border-radius: 999px; background: var(--chip); padding: 6px 14px; font-size: 20px; }
+
+.comments { margin-top: 24px; border-top: 1px solid var(--line); padding-top: 8px; }
+.comment { padding: 10px 0; border-bottom: 1px solid var(--line); }
+.comment p { margin: 2px 0 0; white-space: pre-line; overflow-wrap: anywhere; }
+.comment-head { display: flex; justify-content: space-between; align-items: baseline; }
+form.inline { display: inline; }
+.comment-form { display: flex; flex-direction: column; gap: 8px; margin-top: 16px; }
+.comment-form button { align-self: flex-end; }
+input, textarea {
+  font: inherit; color: var(--text); background: var(--card);
+  border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; width: 100%;
+}
+textarea { resize: vertical; }
+
+.pager { display: flex; justify-content: space-between; align-items: center; margin-top: 24px; }
+.pager a { text-decoration: none; color: var(--muted); padding: 8px 0; }
+.month-nav { margin: 0 0 16px; }
+.month-nav h1 { font-size: 20px; margin: 0; }
+.month-nav a { font-size: 22px; padding: 4px 12px; }
+
+.calendar { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+.dow { text-align: center; color: var(--muted); font-size: 12px; padding-bottom: 4px; }
+.day {
+  aspect-ratio: 1; border-radius: 8px; background: var(--card); position: relative;
+  background-size: cover; background-position: center; text-decoration: none; min-width: 0;
+}
+.day.out { background: transparent; }
+.day .num { position: absolute; top: 3px; left: 5px; font-size: 12px; color: var(--muted); }
+.day.has .num, .day.has .more {
+  color: #fff; text-shadow: 0 1px 3px rgba(0, 0, 0, .7); font-weight: 600;
+}
+.day .more { position: absolute; bottom: 3px; right: 5px; font-size: 12px; }
+
+.message { text-align: center; padding: 48px 0; }
+.message h1 { font-size: 24px; }
+.empty { color: var(--muted); text-align: center; padding: 48px 0; }

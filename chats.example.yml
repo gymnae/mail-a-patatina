@@ -1,0 +1,23 @@
+# Chats that get every moment (photo + caption + a link to like and comment).
+# Email recipients are NOT listed here: they are the people the Immich album is shared with.
+# Edits are picked up at the next daily send.
+
+chats:
+  # A group: everyone in it shares one link. Visitors are asked for their name once and
+  # post through the bot account (BOT_EMAIL) as "[Name] comment".
+  - name: Family WhatsApp
+    channel: whatsapp
+    chat_id: "120363000000000000@g.us"    # find it with: python -m mail_a_patatina whatsapp-groups
+
+  # A one-to-one chat with someone the album is shared with: their link signs in as them.
+  # - name: Opa (WhatsApp)
+  #   channel: whatsapp
+  #   chat_id: "4917600000000@s.whatsapp.net"
+  #   person: opa@example.com
+
+  # - name: Family Signal
+  #   channel: signal
+  #   chat_id: "group.abcdef..."           # from GET http://127.0.0.1:8081/v1/groups/<number>
+  # - name: Family Telegram
+  #   channel: telegram
+  #   chat_id: "-1001234567890"

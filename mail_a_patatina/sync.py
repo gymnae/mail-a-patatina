@@ -1,0 +1,81 @@
+"""Rebuild a feed's in-memory library and member list from its Immich album."""
+
+from __future__ import annotations
+
+import asyncio
+import logging
+from collections import defaultdict
+from typing import TYPE_CHECKING
+
+from .library import BACKLOG, Entry, now
+
+if TYPE_CHECKING:
+    from .core import Feed
+
+log = logging.getLogger(__name__)
+_warned_owners: set[tuple[str, str]] = set()
+
+
+async def run(feed: Feed) -> None:
+    cfg = feed.cfg
+    if not feed.writers:
+        await feed.identify_keys()
+    album = await feed.curator.album(cfg.album_id)
+    feed.members = feed.core.people.members(album.get("albumUsers") or [])
+    if album.get("isActivityEnabled") is False:
+        log.warning("Feed %s: comments and likes are switched off for its album in Immich", feed.id)
+
+    shareable = []
+    async for asset in feed.curator.search(albumIds=[cfg.album_id]):
+        if asset.get("isTrashed") or asset.get("type") not in {"IMAGE", "VIDEO"}:
+            continue
+        caption = ((asset.get("exifInfo") or {}).get("description") or "").strip()
+        if cfg.require_caption and not caption:
+            continue
+        if asset["ownerId"] not in feed.writers:
+            # Without the owner's key we couldn't remember that it was sent, and would resend it daily.
+            if (feed.id, asset["ownerId"]) not in _warned_owners:
+                log.warning("Feed %s: skipping photos owned by user %s; add their API key as a contributor key", feed.id, asset["ownerId"])
+                _warned_owners.add((feed.id, asset["ownerId"]))
+            continue
+        shareable.append((asset, caption))
+
+    known = feed.library.entries
+    unknown = [a for a, _ in shareable if a["id"] not in known]
+    limit = asyncio.Semaphore(8)
+
+    async def fetch(asset: dict) -> tuple[str, dict | None]:
+        async with limit:
+            return asset["id"], await feed.writers[asset["ownerId"]].marker(asset["id"])
+
+    markers = dict(await asyncio.gather(*(fetch(a) for a in unknown)))
+    # First sync of an album nothing was ever sent from: what's there already is backlog.
+    bootstrap = (
+        not feed.synced_once and not known and not cfg.send_backlog
+        and bool(markers) and all(m is None for m in markers.values())
+    )
+    ready = BACKLOG if bootstrap else now()
+
+    entries: list[Entry] = []
+    to_write: defaultdict[str, dict[str, dict]] = defaultdict(dict)
+    for asset, caption in shareable:
+        previous = known.get(asset["id"])
+        marker = previous.marker if previous else markers.get(asset["id"])
+        if marker is None:
+            marker = {"ready": ready, "sent": {}}
+            to_write[asset["ownerId"]][asset["id"]] = marker
+        local = asset["localDateTime"]  # wall-clock time where the photo was taken
+        entry = Entry(asset["id"], asset["ownerId"], asset["type"], local[:19], caption, asset.get("updatedAt", ""), marker)
+        if previous and previous.updated_at != entry.updated_at:
+            feed.core.media.purge(entry.asset_id)
+        entries.append(entry)
+
+    for owner_id, items in to_write.items():
+        await feed.writers[owner_id].set_markers(items)
+
+    added = len(set(e.asset_id for e in entries) - set(known))
+    removed = len(set(known) - set(e.asset_id for e in entries))
+    feed.library.replace(entries)
+    feed.synced_once = True
+    if added or removed:
+        log.info("Feed %s: %d new%s, %d no longer shared", feed.id, added, " (backlog)" if bootstrap else "", removed)

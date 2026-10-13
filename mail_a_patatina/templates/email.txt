@@ -1,0 +1,11 @@
+Good morning, {{ target.name }}!
+{% for e in entries %}
+
+{{ e.taken_at | nice_date }}{% if e.type == "VIDEO" %} (video){% endif %}
+{{ e.caption }}
+React or comment: {{ entry_url(e) }}
+{% endfor %}
+
+See all moments: {{ feed_url }}
+These links sign you in, so please don't forward this email.
+Unsubscribe: {{ unsubscribe_url }}

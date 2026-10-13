@@ -1,0 +1,118 @@
+"""Wires settings, Immich connections and the in-memory caches together for the web app and the CLI.
+
+A Feed is one family: its album, owner key, members, library and chats. Feeds share nothing but the
+relatives' accounts (People), the image cache and the outgoing transports."""
+
+from __future__ import annotations
+
+import asyncio
+import logging
+import time
+
+import httpx
+
+from . import dispatch, mailer, sync
+from .config import FeedConfig, Settings, load_feeds
+from .immich import Immich
+from .library import Library
+from .media import MediaCache
+from .people import Member, People
+
+log = logging.getLogger(__name__)
+
+ACTIVITY_TTL = 15  # seconds; likes and comments are re-read from Immich this often at most
+
+
+class Feed:
+    def __init__(self, core: Core, cfg: FeedConfig):
+        self.core = core
+        self.cfg = cfg
+        self.id = cfg.id
+        # The album owner's key reads the album, its likes/comments and media.
+        self.curator = Immich(core.settings.immich_url, api_key=cfg.api_key)
+        self._contributors = [Immich(core.settings.immich_url, api_key=k) for k in cfg.contributor_keys]
+        # Delivery markers can only be written by an asset's owner: user id -> that user's connection.
+        self.writers: dict[str, Immich] = {}
+        self.members: dict[str, Member] = {}  # album members by user id, refreshed on every sync
+        self.library = Library()
+        self.synced_once = False
+        self.lock = asyncio.Lock()  # this feed's sync and dispatch never overlap
+        self._activities: tuple[float, list[dict]] | None = None
+
+    @property
+    def bot(self) -> Member | None:
+        return next((m for m in self.members.values() if m.email == self.cfg.bot_email), None)
+
+    def by_email(self, email: str) -> Member | None:
+        return next((m for m in self.members.values() if m.email == email.lower()), None)
+
+    def relatives(self) -> list[Member]:
+        """Members who get the daily email: everyone the album is shared with, except its owner and the bot."""
+        return [m for m in self.members.values() if m.role != "owner" and m.email != self.cfg.bot_email]
+
+    async def identify_keys(self) -> None:
+        for client in [self.curator, *self._contributors]:
+            me = await client.me()
+            client.user_id = me["id"]
+            self.writers[me["id"]] = client
+
+    async def sync(self) -> None:
+        async with self.lock:
+            await sync.run(self)
+
+    async def dispatch(self) -> None:
+        async with self.lock:
+            await self.core.people.reload_keys()
+            await sync.run(self)
+            await dispatch.run(self)
+
+    async def activities(self) -> list[dict]:
+        if self._activities is None or time.monotonic() - self._activities[0] > ACTIVITY_TTL:
+            self._activities = (time.monotonic(), await self.curator.activities(self.cfg.album_id))
+        return self._activities[1]
+
+    def activities_changed(self) -> None:
+        self._activities = None
+
+    async def notify_admins(self, subject: str, body: str) -> None:
+        s = self.core.settings
+        if not (self.cfg.admin_emails and s.smtp_host):
+            return
+        try:
+            await mailer.send(s, mailer.build_simple(self.cfg.smtp_from, self.cfg.admin_emails, subject, body))
+        except Exception:
+            log.exception("Could not send admin notification for feed %s", self.id)
+
+    async def aclose(self) -> None:
+        for client in {id(c): c for c in [self.curator, *self._contributors]}.values():
+            await client.aclose()
+
+
+class Core:
+    def __init__(self, settings: Settings):
+        self.settings = settings
+        self.people = People(settings)
+        self.media = MediaCache(settings.data_dir / "cache")
+        self.http = httpx.AsyncClient(timeout=120)
+        self.feeds: dict[str, Feed] = {cfg.id: Feed(self, cfg) for cfg in load_feeds(settings)}
+
+    def feed(self, feed_id: str | None) -> Feed:
+        """The named feed, or the only one when there's just one."""
+        if feed_id is None and len(self.feeds) == 1:
+            return next(iter(self.feeds.values()))
+        if feed_id not in self.feeds:
+            raise SystemExit(f"Name a feed with --feed, one of: {', '.join(self.feeds)}")
+        return self.feeds[feed_id]
+
+    async def sync_all(self) -> None:
+        for feed in self.feeds.values():
+            try:
+                await feed.sync()
+            except Exception:
+                log.exception("Sync of feed %s failed", feed.id)
+
+    async def aclose(self) -> None:
+        await self.people.aclose()
+        for feed in self.feeds.values():
+            await feed.aclose()
+        await self.http.aclose()

@@ -1,0 +1,10 @@
+.env
+config/
+chats.yml
+feeds.yml
+data/
+secrets/
+whatsapp/
+signal/
+.venv/
+**/__pycache__/

@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}{{ month.strftime("%B %Y") }} · {{ site_title }}{% endblock %}
+{% block main %}
+<nav class="pager month-nav">
+  <a href="{{ base }}/calendar?m={{ prev_month }}">←</a>
+  <h1>{{ month.strftime("%B %Y") }}</h1>
+  <a href="{{ base }}/calendar?m={{ next_month }}">→</a>
+</nav>
+<div class="calendar">
+  {% for name in ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] %}<div class="dow">{{ name }}</div>{% endfor %}
+  {% for week in weeks %}{% for day in week %}
+    {% set items = by_day.get(day.isoformat(), []) %}
+    {% if day.month != month.month %}
+    <div class="day out"></div>
+    {% elif items %}
+    <a class="day has" href="{{ base }}/e/{{ items[0].asset_id }}" style="background-image:url('{{ base }}/media/{{ items[0].asset_id }}/thumb')">
+      <span class="num">{{ day.day }}</span>{% if items | length > 1 %}<span class="more">+{{ items | length - 1 }}</span>{% endif %}
+    </a>
+    {% else %}
+    <div class="day"><span class="num">{{ day.day }}</span></div>
+    {% endif %}
+  {% endfor %}{% endfor %}
+</div>
+{% endblock %}

@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="referrer" content="no-referrer">
+  <title>{% block title %}{{ site_title }}{% endblock %}</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
+</head>
+<body>
+  <header class="top">
+    <a class="brand" href="{{ base }}/"><img src="/static/favicon.svg" alt="" width="36" height="36">{{ site_title }}</a>
+    {% if viewer %}
+    <nav><a href="{{ base }}/">Feed</a><a href="{{ base }}/calendar">Calendar</a></nav>
+    {% endif %}
+  </header>
+  <main>{% block main %}{% endblock %}</main>
+</body>
+</html>

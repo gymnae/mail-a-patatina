@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block title %}{{ entry.caption or "A moment" }} · {{ site_title }}{% endblock %}
+{% block main %}
+<article class="moment">
+  <figure>
+    {% if entry.type == "VIDEO" %}
+    <video controls playsinline preload="none" poster="{{ base }}/media/{{ entry.asset_id }}/preview" src="{{ base }}/video/{{ entry.asset_id }}"></video>
+    {% else %}
+    <img src="{{ base }}/media/{{ entry.asset_id }}/preview" alt="{{ entry.caption }}">
+    {% endif %}
+  </figure>
+  <p class="date">{{ entry.taken_at | nice_date }}</p>
+  {% if entry.caption %}<p class="caption">{{ entry.caption }}</p>{% endif %}
+
+  <section id="reactions" class="reactions">
+    {% if can_post %}
+    <form method="post" action="{{ base }}/e/{{ entry.asset_id }}/like">
+      <button class="react{% if activity.my_like_id %} mine{% endif %}" aria-pressed="{{ 'true' if activity.my_like_id else 'false' }}">{{ like }}{% if activity.likes %} {{ activity.likes | length }}{% endif %}</button>
+    </form>
+    {% elif activity.likes %}
+    <span class="react static">{{ like }} {{ activity.likes | length }}</span>
+    {% endif %}
+    {% if activity.likes %}<p class="who">{{ activity.likes | join(", ") }}</p>{% endif %}
+  </section>
+
+  <section id="comments" class="comments">
+    {% for c in activity.comments %}
+    <div class="comment">
+      <div class="comment-head">
+        <strong>{{ c.name }}</strong>
+        {% if c.mine %}
+        <form method="post" action="{{ base }}/comments/{{ c.id }}/delete" class="inline"><button class="link">delete</button></form>
+        {% endif %}
+      </div>
+      <p>{{ c.body }}</p>
+    </div>
+    {% endfor %}
+
+    {% if can_post %}
+    <form method="post" action="{{ base }}/e/{{ entry.asset_id }}/comment" class="comment-form">
+      {% if viewer.needs_name %}
+      <input name="name" placeholder="Your name" maxlength="60" required autocomplete="name">
+      {% endif %}
+      <textarea name="body" rows="2" placeholder="Write something nice{% if viewer.name %}, {{ viewer.name }}{% endif %}…" maxlength="2000" required></textarea>
+      <button>Send</button>
+    </form>
+    {% endif %}
+  </section>
+
+  <nav class="pager">
+    {% if newer %}<a href="{{ base }}/e/{{ newer.asset_id }}">← Newer</a>{% else %}<span></span>{% endif %}
+    {% if older %}<a href="{{ base }}/e/{{ older.asset_id }}">Older →</a>{% endif %}
+  </nav>
+</article>
+
+{% if auto_like %}
+{# The ❤️ link in emails lands here; only this POST saves the like, so link scanners can't like for you. #}
+<form id="auto-like" method="post" action="{{ base }}/e/{{ entry.asset_id }}/like" hidden>
+  <input type="hidden" name="mode" value="set">
+</form>
+<script>document.getElementById("auto-like").submit();</script>
+{% endif %}
+{% endblock %}

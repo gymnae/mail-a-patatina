@@ -1,0 +1,29 @@
+# Several families on one installation: copy to config/feeds.yml (chmod 600, it contains API keys).
+# Each family ("feed") is one Immich album. Its pages live under PUBLIC_URL/<id>/, and its links,
+# photos, likes and comments are never visible from another feed.
+# Anything left out falls back to .env (SITE_TITLE, TZ, SEND_TIME, SEND_MODE, REQUIRE_CAPTION, SMTP_FROM, ADMIN_EMAILS).
+
+feeds:
+  - id: mueller                      # lowercase letters, digits, dashes; appears in the URLs
+    title: Die Müllers
+    album_id: 00000000-0000-4000-8000-000000000001
+    api_key: "album owner's key"     # album.read, asset.read, asset.view, asset.update, activity.read, user.read, albumUser.create
+    # Co-parents who add their own photos: a key from THEIR account with user.read, asset.read, asset.update
+    # contributor_keys: ["co-parent's key"]
+    timezone: Europe/Berlin
+    send_time: "07:00"
+    # send_mode: drip
+    # smtp_from: "Die Müllers <family@example.com>"
+    # admin_emails: [mama@example.com]
+    # bot_name: Müller WhatsApp     # the account group-chat visitors post as (create it with add-bot --feed mueller)
+    chats:
+      - name: Family WhatsApp
+        channel: whatsapp
+        chat_id: "120363000000000000@g.us"
+
+  - id: schmidt
+    title: Schmidts
+    album_id: 00000000-0000-4000-8000-000000000002
+    api_key: "the other owner's key"
+    timezone: Europe/Vienna
+    send_time: "08:30"

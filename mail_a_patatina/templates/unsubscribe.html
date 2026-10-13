@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}Unsubscribe · {{ site_title }}{% endblock %}
+{% block main %}
+<div class="message">
+  <h1>Stop the emails?</h1>
+  <p>{{ email }} won't get any more emails with moments, from this or any other family feed. The links keep working.</p>
+  <form method="post" action="{{ base }}/unsubscribe?t={{ token | urlencode }}"><button>Unsubscribe</button></form>
+</div>
+{% endblock %}

@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 640" width="1280" height="640">
+  <rect width="1280" height="640" fill="#FFF6E8"/>
+  <circle cx="300" cy="320" r="230" fill="#FFE7C2"/>
+  <g transform="translate(80 100) scale(1.72)">
+  <g stroke="#7A4E25" stroke-width="6" stroke-linecap="round" stroke-linejoin="round">
+    <!-- on its way -->
+    <g fill="none" opacity="0.45">
+      <path d="M14 158 H32"/>
+      <path d="M8 178 H30"/>
+      <path d="M16 198 H32"/>
+    </g>
+
+    <!-- envelope: back and open flap -->
+    <rect x="40" y="112" width="176" height="110" rx="14" fill="#F1DDB4"/>
+    <path d="M46 118 L128 60 L210 118 Z" fill="#E6C894"/>
+
+    <!-- the patatina -->
+    <path d="M80 124 C74 92 92 62 124 58 C140 56 150 62 162 64 C180 70 188 94 182 118 C179 132 176 140 174 150 C166 166 150 172 128 172 C100 172 84 156 80 124 Z" fill="#E8B866"/>
+    <g stroke="none" fill="#C98F43" opacity="0.75">
+      <ellipse cx="154" cy="80" rx="5" ry="3.5" transform="rotate(-20 154 80)"/>
+      <ellipse cx="97" cy="96" rx="4" ry="3"/>
+      <ellipse cx="160" cy="152" rx="4" ry="3" transform="rotate(25 160 152)"/>
+    </g>
+    <!-- sprout -->
+    <path d="M131 59 C130 49 132 42 137 36" fill="none"/>
+    <path d="M136 38 C142 26 158 24 164 30 C158 40 146 42 136 38 Z" fill="#8BC34A" stroke-width="5"/>
+    <path d="M134 42 C126 32 112 32 108 38 C114 46 126 46 134 42 Z" fill="#9CCC65" stroke-width="5"/>
+    <!-- face -->
+    <g stroke="none">
+      <ellipse cx="111" cy="110" rx="7.5" ry="9.5" fill="#3B2412"/>
+      <ellipse cx="151" cy="110" rx="7.5" ry="9.5" fill="#3B2412"/>
+      <circle cx="113.5" cy="106" r="2.8" fill="#FFFFFF"/>
+      <circle cx="153.5" cy="106" r="2.8" fill="#FFFFFF"/>
+      <ellipse cx="98" cy="128" rx="9" ry="6" fill="#F28B82" opacity="0.85"/>
+      <ellipse cx="164" cy="128" rx="9" ry="6" fill="#F28B82" opacity="0.85"/>
+    </g>
+    <path d="M120 128 Q131 140 142 128" fill="none" stroke-width="5"/>
+
+    <!-- envelope front pocket -->
+    <path d="M40 142 L128 194 L216 142 V208 Q216 222 202 222 H54 Q40 222 40 208 Z" fill="#FFF3DC"/>
+    <!-- little hands holding on -->
+    <ellipse cx="92" cy="170" rx="11" ry="8.5" fill="#E8B866" transform="rotate(-30 92 170)"/>
+    <ellipse cx="166" cy="170" rx="11" ry="8.5" fill="#E8B866" transform="rotate(30 166 170)"/>
+
+    <!-- stamp with a heart -->
+    <rect x="174" y="180" width="30" height="34" rx="3" fill="#FFFFFF" stroke="#E0675F" stroke-width="3" stroke-dasharray="4 3"/>
+    <path d="M189 205 C180 199 178 193 181 190 C184 187 188 189 189 192 C190 189 194 187 197 190 C200 193 198 199 189 205 Z" fill="#E0675F" stroke="none"/>
+  </g>
+
+  <!-- love on the way -->
+  <path d="M206 70 C198 64 196 58 199 55 C202 52 206 54 207 57 C208 54 212 52 215 55 C218 58 216 64 206 70 Z" fill="#F07C86"/>
+  <path d="M60 78 C55 74 54 70 56 68 C58 66 60.5 67.5 61 69.5 C61.5 67.5 64 66 66 68 C68 70 67 74 60 78 Z" fill="#F07C86" opacity="0.8"/>
+</g>
+  <g font-family="Nunito, 'Varela Round', 'Segoe UI', Helvetica, Arial, sans-serif" fill="#5A3A1C">
+    <text x="590" y="296" font-size="76" font-weight="800">mail-a-patatina</text>
+    <text x="594" y="364" font-size="34" fill="#7A4E25">Daily family moments from Immich,</text>
+    <text x="594" y="410" font-size="34" fill="#7A4E25">delivered by email and chat.</text>
+  </g>
+</svg>

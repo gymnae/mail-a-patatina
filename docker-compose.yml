@@ -1,0 +1,49 @@
+services:
+  app:
+    # Built by .github/workflows/container.yml on every push to main (and for v* tags).
+    # Set MAP_IMAGE in .env to your repository's image, or build locally with `docker compose build`.
+    image: ${MAP_IMAGE:-ghcr.io/your-github-user/mail-a-patatina:latest}
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      - ./data:/data # image cache only, safe to delete
+      - ./config:/config:ro # feeds.yml (several families) or chats.yml (one family); contains keys, keep private
+      - ./secrets:/secrets # relatives' Immich API keys, written by add-relative; back up like .env
+    ports:
+      - "8080:8080" # put your reverse proxy (with HTTPS) in front of this; Immich stays private
+    # If Immich runs in another compose project on this host, join its network and
+    # use IMMICH_URL=http://immich-server:2283
+    # networks: [default, immich]
+
+  # WhatsApp gateway (GOWA). Start with: docker compose --profile whatsapp up -d
+  # Pair once by opening http://127.0.0.1:3000 and scanning the QR code with WhatsApp > Linked devices.
+  whatsapp:
+    profiles: [whatsapp]
+    image: aldinokemal2104/go-whatsapp-web-multidevice:latest
+    restart: unless-stopped
+    command: [rest, --port=3000, --os=Chrome, --account-validation=false]
+    environment:
+      - APP_BASIC_AUTH=${WHATSAPP_AUTH}
+    volumes:
+      - ./whatsapp:/app/storages
+    ports:
+      - "127.0.0.1:3000:3000" # only for pairing from this machine
+
+  # Signal gateway. Start with: docker compose --profile signal up -d
+  # Link once via http://127.0.0.1:8081/v1/qrcodelink?device_name=family-feed
+  signal:
+    profiles: [signal]
+    image: bbernhard/signal-cli-rest-api:latest
+    restart: unless-stopped
+    environment:
+      - MODE=json-rpc
+    volumes:
+      - ./signal:/home/.local/share/signal-cli
+    ports:
+      - "127.0.0.1:8081:8080"
+
+# networks:
+#   immich:
+#     external: true
+#     name: immich_default
