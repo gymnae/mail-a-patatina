@@ -27,7 +27,7 @@ from .config import ChatSpec, Settings
 from .core import Core, Feed
 from .immich import LoginFailed
 from .library import Entry
-from .links import LIKE, nice_date, read_token
+from .links import LIKE, make_token, nice_date, read_photo_ticket, read_token
 from .people import Member
 from .setup import router as setup_router
 
@@ -371,6 +371,20 @@ async def media(request: Request, feed_id: str, asset_id: str, size: str):
         raise HTTPException(404)
     data = await core.media.jpeg(feed.curator, asset_id, size)
     return Response(data, media_type="image/jpeg", headers={"Cache-Control": "private, max-age=86400"})
+
+
+@app.get("/{feed_id}/p/{asset_id}/{ticket}.jpg")
+async def emailed_photo(feed_id: str, asset_id: str, ticket: str):
+    """A photo in the email of a family that keeps its photos on the server. Checked on every load: the
+    ticket is genuine and not expired, its recipient is still in the album, the photo is still shared."""
+    feed = get_feed(feed_id)
+    recipient = read_photo_ticket(core.settings, feed.id, asset_id, ticket)
+    if recipient is None or viewer_for_token(feed, make_token(core.settings, feed.id, *recipient)) is None:
+        raise HTTPException(404)
+    shared_entry(feed, asset_id)
+    data = await core.media.jpeg(feed.curator, asset_id, "preview")
+    return Response(data, media_type="image/jpeg", headers={
+        "Cache-Control": "private, no-store", "X-Robots-Tag": "noindex, noimageindex", "Referrer-Policy": "no-referrer"})
 
 
 @app.get("/{feed_id}/video/{asset_id}")

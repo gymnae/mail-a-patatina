@@ -56,6 +56,7 @@ class Settings:
     sync_minutes: int
     settle_minutes: int
     resend_hours: int
+    photo_link_days: int  # how long a photo in an email stays viewable, for families who keep photos on the server
     smtp_host: str
     smtp_port: int
     smtp_security: str
@@ -98,6 +99,7 @@ class Settings:
             sync_minutes=int(env("SYNC_MINUTES", "15")),
             settle_minutes=int(env("SETTLE_MINUTES", "30")),
             resend_hours=int(env("RESEND_HOURS", "48")),
+            photo_link_days=int(env("PHOTO_LINK_DAYS", "30")),
             smtp_host=env("SMTP_HOST", ""),
             smtp_port=int(env("SMTP_PORT", "465" if security == "ssl" else "587")),
             smtp_security=security,
@@ -186,6 +188,9 @@ class FeedConfig:
     contributor_keys: list[str]
     require_caption: bool
     send_tag: str  # the Immich tag that queues a photo for sending (each uploader tags their own photos)
+    # Photos are never attached to emails or chat messages: emails load them from this server through
+    # expiring links, chats get the caption and a link only.
+    keep_photos_on_server: bool
     send_backlog: bool
     timezone: str
     send_time: str
@@ -232,6 +237,7 @@ def feed_config(raw: dict, settings: Settings) -> FeedConfig:
         contributor_keys=_list(raw.get("contributor_keys")),
         require_caption=_bool(raw.get("require_caption", env("REQUIRE_CAPTION")), True),
         send_tag=str(raw.get("send_tag") or env("SEND_TAG") or "Patatina").strip(),
+        keep_photos_on_server=_bool(raw.get("keep_photos_on_server", env("KEEP_PHOTOS_ON_SERVER")), False),
         send_backlog=_bool(raw.get("send_backlog", env("SEND_BACKLOG")), False),
         timezone=str(raw.get("timezone") or env("TZ", "UTC")),
         send_time=str(raw.get("send_time") or env("SEND_TIME", "07:00")),

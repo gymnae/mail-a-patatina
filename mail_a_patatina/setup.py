@@ -292,7 +292,7 @@ async def new_album(request: Request):
 async def create(
     request: Request, csrf: str = Form(), album_id: str = Form(), title: str = Form(),
     send_time: str = Form("07:00"), timezone: str = Form("Europe/Berlin"), send_mode: str = Form("digest"),
-    require_caption: str = Form(""), notify_me: str = Form(""),
+    require_caption: str = Form(""), notify_me: str = Form(""), keep_photos_on_server: str = Form(""),
 ):
     session = require(request, csrf)
     if not session.draft_key:
@@ -312,6 +312,7 @@ async def create(
         "created_at": now(),
         "timezone": timezone, "send_time": send_time, "send_mode": send_mode,
         "require_caption": bool(require_caption),
+        "keep_photos_on_server": bool(keep_photos_on_server),
         "admin_emails": [session.email] if notify_me else [],
         "chats": [],
         "pending": [],
@@ -394,6 +395,7 @@ def back(feed_id: str, msg: str = "", error: str = "") -> RedirectResponse:
 async def save_settings(
     request: Request, feed_id: str, csrf: str = Form(), title: str = Form(), send_time: str = Form(),
     timezone: str = Form(), send_mode: str = Form(), require_caption: str = Form(""), notify_me: str = Form(""),
+    keep_photos_on_server: str = Form(""),
 ):
     session = require(request, csrf)
     raw = owned(request, session, feed_id)
@@ -401,7 +403,8 @@ async def save_settings(
     if problem:
         return back(feed_id, error=problem)
     raw.update(title=title.strip()[:80], send_time=send_time, timezone=timezone, send_mode=send_mode,
-               require_caption=bool(require_caption), admin_emails=[session.email] if notify_me else [])
+               require_caption=bool(require_caption), keep_photos_on_server=bool(keep_photos_on_server),
+               admin_emails=[session.email] if notify_me else [])
     core(request).store.save(raw)
     await core(request).apply_stored(feed_id)
     return back(feed_id, msg="Saved.")

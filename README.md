@@ -52,6 +52,11 @@ Tags belong to one user in Immich, and only a photo's owner can tag it. A co-par
 - Immich allows one ❤️ per account, so a group has one shared ❤️.
 - A one-to-one chat can instead be tied to a relative (`person:` in the chat's config), so its links sign in as them.
 
+**Keeping photos on the server** (per family, on the setup page; `KEEP_PHOTOS_ON_SERVER`). Nothing is attached to emails or chat messages, so there's no photo file in anyone's mailbox or chat to forward or save:
+- **Emails** load each photo from `PUBLIC_URL` through a link made for that one recipient. The link signs nobody in. It stops working after `PHOTO_LINK_DAYS` (default 30), and right away if the photo is untagged or removed from the album, or the recipient is removed.
+- **Chats** get the caption and the link only. Telegram's link preview is switched off; the pages carry no preview image for WhatsApp or Signal to pick up.
+- **What it doesn't prevent:** screenshots, saving the photo while it's displayed, or copies made by mail services that fetch images through their own proxy (Gmail does, and Apple Mail's privacy protection) while the link is valid. Some mail apps block remote images until the reader taps "load images"; the caption and buttons show either way. It makes photos much harder to pass around, not impossible.
+
 **Only Immich's reactions.** Immich has exactly two kinds of activity: like (❤️) and comment. The site offers just those.
 
 **What gets sent.** Each photo is marked in Immich when it's sent to each recipient and chat:

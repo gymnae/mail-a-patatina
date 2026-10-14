@@ -8,4 +8,5 @@
   <label class="choice"><input type="radio" name="send_mode" value="drip" {% if raw and raw.send_mode == 'drip' %}checked{% endif %}><span><b>One a day</b>: a queue, so a big batch spreads over the following days</span></label>
 </fieldset>
 <label class="choice"><input type="checkbox" name="require_caption" value="1" {% if not raw or raw.require_caption is not false %}checked{% endif %}><span>Only send tagged photos that also have a description in Immich (it becomes the caption)</span></label>
+<label class="choice"><input type="checkbox" name="keep_photos_on_server" value="1" {% if raw and raw.keep_photos_on_server %}checked{% endif %}><span><b>Keep photos on this server</b>: nothing is attached to emails or chat messages. Emails load the photos from here, for {{ s.photo_link_days }} days and only while the photo and the relative are still in the album; chats get the caption and a link.</span></label>
 <label class="choice"><input type="checkbox" name="notify_me" value="1" {% if raw and raw.admin_emails %}checked{% endif %}><span>Email me when someone comments</span></label>

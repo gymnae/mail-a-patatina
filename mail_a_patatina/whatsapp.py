@@ -87,6 +87,9 @@ class Gateway:
         results = await self._results("GET", "/user/my/groups", device)
         return [(g.get("Name") or "", g["JID"]) for g in (results or {}).get("data") or [] if g.get("JID")]
 
+    async def send_text(self, device: str, chat_id: str, text: str) -> None:
+        await self._results("POST", "/send/message", device, json={"phone": chat_id, "message": text})
+
     async def send_image(self, device: str, chat_id: str, jpeg: bytes, caption: str) -> None:
         await self._results(
             "POST", "/send/image", device,

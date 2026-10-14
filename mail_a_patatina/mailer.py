@@ -15,7 +15,7 @@ from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 from .config import FeedConfig, Settings
 from .library import Entry
-from .links import LIKE, entry_url, feed_url, nice_date, unsubscribe_url
+from .links import LIKE, entry_url, feed_url, nice_date, photo_url, unsubscribe_url
 
 if TYPE_CHECKING:
     from .dispatch import Target
@@ -34,13 +34,14 @@ def build_digest(
     first = entries[0].caption or "A new moment"
     subject = first if len(entries) == 1 else f"{first} (+{len(entries) - 1} more)"
     domain = parseaddr(feed.smtp_from)[1].rpartition("@")[2] or None
-    cids = {e.asset_id: make_msgid(domain=domain) for e in entries}
+    cids = {asset_id: make_msgid(domain=domain) for asset_id in images}  # empty if photos stay on the server
     logo_cid = make_msgid(domain=domain)
     ctx = {
         "title": feed.title,
         "target": target,
         "entries": entries,
-        "cids": {k: v[1:-1] for k, v in cids.items()},
+        "img_src": lambda e: (f"cid:{cids[e.asset_id][1:-1]}" if e.asset_id in cids
+                              else photo_url(s, feed.id, e.asset_id, target.token)),
         "logo_cid": logo_cid[1:-1],
         "like": LIKE,
         "entry_url": lambda e, like=False: entry_url(s, feed.id, e.asset_id, target.token, like),

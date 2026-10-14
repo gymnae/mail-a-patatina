@@ -20,7 +20,7 @@
   <tr><td style="padding-bottom:24px;">
     <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#ffffff;border-radius:14px;overflow:hidden;">
       <tr><td>
-        <a href="{{ entry_url(e) }}"><img src="cid:{{ cids[e.asset_id] }}" width="600" alt="{{ e.caption }}" style="display:block;width:100%;height:auto;border:0;"></a>
+        <a href="{{ entry_url(e) }}"><img src="{{ img_src(e) }}" width="600" alt="{{ e.caption or 'Photo' }}" style="display:block;width:100%;height:auto;border:0;"></a>
       </td></tr>
       <tr><td style="padding:16px 20px 4px;font-size:13px;color:#7a6f66;">
         {{ e.taken_at | nice_date }}{% if e.type == "VIDEO" %} · ▶️ <a href="{{ entry_url(e) }}" style="color:#7a6f66;">watch the video</a>{% endif %}

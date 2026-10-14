@@ -6,6 +6,7 @@ import base64
 import datetime as dt
 import hashlib
 import hmac
+import time
 from urllib.parse import urlencode
 
 from .config import Settings
@@ -34,6 +35,27 @@ def read_token(s: Settings, token: str) -> tuple[str, str, str] | None:
     if kind not in ("u", "c") or not hmac.compare_digest(sig, _sign(s, f"{kind}.{feed_id}.{ident}")):
         return None
     return feed_id, kind, ident
+
+
+def photo_url(s: Settings, feed_id: str, asset_id: str, token: str) -> str:
+    """An image link for one recipient's email. Unlike their magic link it signs nobody in, and it stops
+    working after PHOTO_LINK_DAYS, or as soon as the photo or the recipient leaves the album."""
+    kind, _, ident, _ = token.split(".")
+    expires = int(time.time()) + s.photo_link_days * 86400
+    payload = f"{kind}.{ident}.{expires}"
+    return f"{s.public_url}/{feed_id}/p/{asset_id}/{payload}.{_sign(s, f'photo.{feed_id}.{asset_id}.{payload}')}.jpg"
+
+
+def read_photo_ticket(s: Settings, feed_id: str, asset_id: str, ticket: str) -> tuple[str, str] | None:
+    """-> (kind, ident) of the recipient, or None if the ticket is forged or expired."""
+    try:
+        kind, ident, expires, sig = ticket.split(".")
+        expired = int(expires) < time.time()
+    except ValueError:
+        return None
+    if expired or not hmac.compare_digest(sig, _sign(s, f"photo.{feed_id}.{asset_id}.{kind}.{ident}.{expires}")):
+        return None
+    return kind, ident
 
 
 def derived_password(s: Settings, email: str) -> str:

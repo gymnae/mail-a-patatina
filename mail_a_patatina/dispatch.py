@@ -81,7 +81,8 @@ async def _record(feed: Feed, target: Target, entries: list[Entry]) -> None:
 
 async def send_email(feed: Feed, target: Target, entries: list[Entry], record: bool = True) -> None:
     core = feed.core
-    images = {e.asset_id: await core.media.jpeg(feed.curator, e.asset_id, "preview") for e in entries}
+    images = {} if feed.cfg.keep_photos_on_server else {
+        e.asset_id: await core.media.jpeg(feed.curator, e.asset_id, "preview") for e in entries}
     await mailer.send(core.settings, mailer.build_digest(core.settings, feed.cfg, target, entries, images))
     if record:
         await _record(feed, target, entries)
@@ -91,7 +92,7 @@ async def send_chat(feed: Feed, target: Target, entries: list[Entry]) -> None:
     core = feed.core
     send = SENDERS[target.kind]
     for entry in entries:
-        jpeg = await core.media.jpeg(feed.curator, entry.asset_id, "preview")
+        jpeg = None if feed.cfg.keep_photos_on_server else await core.media.jpeg(feed.curator, entry.asset_id, "preview")
         await send(core.settings, core.http, feed.cfg, target.address, jpeg, chat_caption(feed, target, entry))
         await _record(feed, target, [entry])  # per message, so a failure halfway doesn't resend the first ones
 
