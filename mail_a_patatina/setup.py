@@ -228,8 +228,8 @@ async def check_key(request: Request, key: str, needed: list[str]) -> tuple[dict
         return None, f"Immich refused this key: {e}"
     finally:
         await client.aclose()
-    too_much = sorted(p for p in perms if p == "all" or p.startswith(("admin", "system", "maintenance", "server"))
-                      or p.endswith(".delete"))
+    too_much = sorted(p for p in perms if p not in needed and (
+        p == "all" or p.startswith(("admin", "system", "maintenance", "server")) or p.endswith(".delete")))
     if too_much:
         return None, ("This key can do too much: " + ", ".join(too_much)
                       + ". Create one with only the permissions listed below.")
@@ -349,8 +349,10 @@ async def feed_page(request: Request, feed_id: str, msg: str = "", error: str = 
             log.exception("Reading the members of %s", feed_id)
     members = []
     if feed is not None:
+        uploaders = set(contributor_keys(feed)) | feed.unkeyed
         for m in feed.relatives():
-            members.append({"name": m.name, "email": m.email, "ready": m.email in c.people.keys})
+            if m.id not in uploaders:  # co-parents, with or without a key here: listed under co-parents
+                members.append({"id": m.id, "name": m.name, "email": m.email, "ready": m.email in c.people.keys})
     s = c.settings
     channels = [k for k in ("signal", "telegram") if {"signal": s.signal_url and s.signal_number,
                                                       "telegram": s.telegram_token}[k]]
@@ -455,6 +457,7 @@ async def add_coparent(request: Request, feed_id: str, csrf: str = Form(), api_k
 
 @router.post("/f/{feed_id}/coparents/remove")
 async def remove_coparent(request: Request, feed_id: str, csrf: str = Form(), user_id: str = Form()):
+    """Forget a co-parent's key. Their place in the Immich album is left alone; their photos just aren't sent."""
     session = require(request, csrf)
     raw = owned(request, session, feed_id)
     feed = core(request).feeds.get(feed_id)
@@ -465,7 +468,47 @@ async def remove_coparent(request: Request, feed_id: str, csrf: str = Form(), us
     raw["contributor_keys"] = list(keys.values())
     core(request).store.save(raw)
     await core(request).apply_stored(feed_id)
-    return back(feed_id, msg="Disconnected. Their photos aren't sent anymore; they can revoke the key in Immich.")
+    return back(feed_id, msg="Removed. Their photos aren't sent anymore; they can revoke the key in Immich. "
+                             "Their access to the album in Immich is unchanged.")
+
+
+@router.post("/f/{feed_id}/people/remove")
+async def remove_person(request: Request, feed_id: str, csrf: str = Form(), user_id: str = Form()):
+    """Take a relative out of the album: the album's members are who gets the emails. Their Immich account
+    stays (the admin can delete it). Co-parents are removed with /coparents/remove instead."""
+    session = require(request, csrf)
+    owned(request, session, feed_id)
+    c = core(request)
+    feed = c.feeds.get(feed_id)
+    if feed is None:
+        return back(feed_id, error="The album couldn't be read yet. Try again in a moment.")
+    member = feed.members.get(user_id)
+    if member is None:
+        return back(feed_id)
+    if (member.role == "owner" or member.email == feed.cfg.bot_email
+            or user_id in contributor_keys(feed) or user_id in feed.unkeyed):  # co-parents keep their album access
+        raise HTTPException(400)
+    try:
+        await feed.curator.remove_album_user(feed.cfg.album_id, user_id)
+    except httpx.HTTPStatusError as e:
+        if e.response.status_code != 403:
+            raise
+        return back(feed_id, error="Your Immich key may not remove people (albumUser.delete is missing). "
+                                   "Replace it under “Immich key”, or remove them in Immich: album → ⋮ → Options.")
+    await feed.refresh_members()
+    if member.email in c.people.keys and not still_needed(c, member.email):
+        # Their account and key are of no use to anyone now; deleting accounts needs the admin.
+        await notify_install_admins(
+            request, f"{member.name} <{member.email}> is in no family's album anymore",
+            f"docker compose run --rm -e IMMICH_ADMIN_API_KEY app python -m mail_a_patatina forget {member.email}")
+    return back(feed_id, msg=f"{member.name} removed. Nothing more is sent to them, and their links stop working.")
+
+
+def still_needed(c, email: str) -> bool:
+    """Is this person in another family's album, or waiting to be added to one? (From what the app knows;
+    `forget` checks every album in Immich before deleting anything.)"""
+    return (any(f.by_email(email) for f in c.feeds.values())
+            or any(p["email"] == email for raw in c.store.all().values() for p in raw.get("pending", [])))
 
 
 async def find_signal_group(request: Request, name: str) -> tuple[str | None, str | None]:
@@ -700,12 +743,14 @@ async def delete_feed(request: Request, feed_id: str, csrf: str = Form(), confir
                      "the photos, likes and comments stay in your album.")
 
 
-async def notify_install_admins(request: Request, subject: str) -> None:
+APPROVE = "docker compose run --rm -e IMMICH_ADMIN_API_KEY app python -m mail_a_patatina approve"
+
+
+async def notify_install_admins(request: Request, subject: str, command: str = APPROVE) -> None:
     s = settings(request)
     if not (s.install_admin_emails and s.smtp_host):
         return
-    body = (f"{subject}.\n\nApprove on the server with:\n"
-            "  docker compose run --rm -e IMMICH_ADMIN_API_KEY app python -m mail_a_patatina approve\n")
+    body = f"{subject}.\n\nOn the server, run:\n  {command}\n"
     try:
         await mailer.send(s, mailer.build_simple(s.smtp_from, s.install_admin_emails, f"mail-a-patatina: {subject}", body))
     except Exception:

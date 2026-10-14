@@ -160,7 +160,61 @@ async def check(feed: Feed) -> None:
         print(f"  {c.kind:9} {c.name} → {c.address}")
 
 
-def pending(core: Core) -> None:
+async def unused_accounts(core: Core) -> list[str]:
+    """Relatives' accounts (with a key here) that no family's album has anymore."""
+    in_use = set()
+    for feed in core.feeds.values():
+        await feed.refresh_members()
+        in_use |= {m.email for m in feed.members.values()}
+    waiting = {p["email"] for raw in core.store.all().values() for p in raw.get("pending", [])}
+    return sorted(set(core.people.keys) - in_use - waiting)
+
+
+async def forget(core: Core, email: str) -> None:
+    """Delete the Immich account of a relative no family needs anymore, and its key. Only accounts
+    mail-a-patatina created (named with USER_PREFIX), and only if no album at all is shared with them,
+    including albums outside mail-a-patatina."""
+    s = core.settings
+    email = email.strip().lower()
+    if not s.admin_api_key:
+        raise SystemExit("Set IMMICH_ADMIN_API_KEY (adminUser.read, adminUser.delete) for this command")
+    waiting = [raw["id"] for raw in core.store.all().values() if any(p["email"] == email for p in raw.get("pending", []))]
+    if waiting:
+        raise SystemExit(f"{email} is waiting for approval in {', '.join(waiting)}; `reject` them there first")
+    admin = Immich(s.immich_url, api_key=s.admin_api_key)
+    try:
+        user = next((u for u in await admin.admin_users() if u["email"].lower() == email), None)
+        if user is None:
+            save_key(s.keys_file, email, None)
+            print(f"{email} has no Immich account (anymore). Its key, if any, is removed.")
+            return
+        if not s.user_prefix or not user["name"].startswith(s.user_prefix):
+            raise SystemExit(f"{email} (“{user['name']}”) wasn't created by mail-a-patatina, so it isn't deleted here. "
+                             "Delete it in Immich yourself if you mean to.")
+        # Only the person themselves can list the albums shared with them.
+        async with password_login(admin):
+            try:
+                session = await Immich.login(s.immich_url, email, derived_password(s, email))
+            except LoginFailed:
+                raise SystemExit(f"Can't sign in as {email} to check which albums they're in. "
+                                 "Check in Immich, and delete the account there if it's unused.") from None
+            try:
+                albums = await session.shared_albums()
+            finally:
+                await session.logout()
+                await session.aclose()
+        if albums:
+            raise SystemExit(f"{email} is still in " + ", ".join(f"“{a['albumName']}”" for a in albums)
+                             + ". Nothing was deleted.")
+        await admin.admin_delete_user(user["id"])
+    finally:
+        await admin.aclose()
+    save_key(s.keys_file, email, None)
+    print(f"Deleted {email}. Immich purges the account after its deletion delay (Administration → Settings → "
+          "User settings); their old likes and comments go with it.")
+
+
+async def pending(core: Core) -> None:
     waiting = False
     for raw in core.store.all().values():
         feed = core.feeds.get(raw["id"])
@@ -175,6 +229,11 @@ def pending(core: Core) -> None:
             print("  group-chat account (for comments from chat links)")
     if not waiting:
         print("Nothing is waiting for approval.")
+    unused = await unused_accounts(core)
+    if unused:
+        print("\nIn no family's album anymore (delete with `forget EMAIL`):")
+        for email in unused:
+            print(f"  {email}")
 
 
 async def approve(core: Core, feed_id: str | None, email: str | None) -> None:
@@ -239,9 +298,11 @@ async def main() -> None:
     wa = sub.add_parser("whatsapp-link", help="link a WhatsApp account to a feed defined in .env/feeds.yml (prints a code)")
     wa.add_argument("phone", help="the account's number with country code, e.g. +491701234567")
     sub.add_parser("whatsapp-groups", help="list the WhatsApp groups of a feed's account (--feed) to find chat ids")
-    sub.add_parser("pending", help="show relatives and group-chat accounts waiting for approval")
+    sub.add_parser("pending", help="show accounts waiting for approval, and those no family needs anymore")
     app = sub.add_parser("approve", help="create the waiting accounts (all, or one feed with --feed, or one EMAIL)")
     app.add_argument("email", nargs="?")
+    fgt = sub.add_parser("forget", help="delete a relative's Immich account that no album is shared with anymore")
+    fgt.add_argument("email")
     rej = sub.add_parser("reject", help="drop a waiting relative of a feed (needs --feed)")
     rej.add_argument("email")
     args = parser.parse_args()
@@ -270,10 +331,13 @@ async def main() -> None:
             return
 
         if args.cmd == "pending":
-            pending(core)
+            await pending(core)
             return
         if args.cmd == "approve":
             await approve(core, args.feed, args.email)
+            return
+        if args.cmd == "forget":
+            await forget(core, args.email)
             return
         if args.cmd == "reject":
             raw = core.store.get(core.feed(args.feed).id) if args.feed else None

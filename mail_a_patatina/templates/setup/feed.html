@@ -22,16 +22,17 @@
   <h2>Co-parents</h2>
   <p class="hint">Someone else who adds photos to the album, like the other parent. Immich only lets a photo's owner tag it,
     so their photos are sent once you add a key from <i>their</i> account here, and they tag them themselves.</p>
-  {% if skipped %}<p class="notice error" role="alert">Photos by {{ skipped | join(", ") }} are skipped: add their key below.</p>{% endif %}
+  {% if skipped %}<p class="hint">Not sent: photos by {{ skipped | join(", ") }}, because there's no key from them here. Add one below if they should be.</p>{% endif %}
   {% if feed and feed.refused_keys %}<p class="notice error" role="alert">Immich refused {{ feed.refused_keys }} co-parent key(s), probably revoked.
     Add a new key for that person below.</p>{% endif %}
   <ul class="people">
     {% for c in coparents %}
     <li>{% if c.name is defined %}<b>{{ c.name }}</b> <span class="hint">{{ c.email }}</span>{% set uid = c.id %}
       {% else %}<b>Not in the album anymore</b>{% set uid = c %}{% endif %} <span class="tag ok">connected</span>
-      <form method="post" action="/setup/f/{{ raw.id }}/coparents/remove" class="inline">
+      <form method="post" action="/setup/f/{{ raw.id }}/coparents/remove" class="inline"
+            onsubmit='return confirm({{ ("Remove " ~ (c.name if c.name is defined else "this co-parent") ~ "? Their photos stop being sent. Their access to the album in Immich stays as it is.") | tojson }})'>
         <input type="hidden" name="csrf" value="{{ session.csrf }}"><input type="hidden" name="user_id" value="{{ uid }}">
-        <button class="link">disconnect</button></form></li>
+        <button class="link">remove</button></form></li>
     {% else %}
     <li class="hint">None.</li>
     {% endfor %}
@@ -59,7 +60,11 @@
   <ul class="people">
     {% for m in members %}
     <li><b>{{ m.name }}</b> <span class="hint">{{ m.email }}</span>
-      {% if m.ready %}<span class="tag ok">ready</span>{% else %}<span class="tag">own Immich account, no email</span>{% endif %}</li>
+      {% if m.ready %}<span class="tag ok">ready</span>{% else %}<span class="tag">own Immich account, no email</span>{% endif %}
+      <form method="post" action="/setup/f/{{ raw.id }}/people/remove" class="inline"
+            onsubmit='return confirm({{ ("Remove " ~ m.name ~ " from the album? They get nothing more, and their links stop working.") | tojson }})'>
+        <input type="hidden" name="csrf" value="{{ session.csrf }}"><input type="hidden" name="user_id" value="{{ m.id }}">
+        <button class="link">remove</button></form></li>
     {% endfor %}
     {% for p in raw.pending or [] %}
     <li><b>{{ p.name }}</b> <span class="hint">{{ p.email }}</span> <span class="tag wait">waiting for approval</span>

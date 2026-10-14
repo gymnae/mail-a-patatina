@@ -21,10 +21,11 @@ RELATIVE_PERMISSIONS = [
     "activity.create", "activity.read", "activity.delete", "user.read", "userPreference.read", "userPreference.update",
 ]
 KEY_NAME = "mail-a-patatina"
-# What the album owner's key needs (entered on the setup page). Nothing that deletes.
+# What the album owner's key needs (entered on the setup page). The only delete right is albumUser.delete,
+# which takes someone out of the album (never photos or accounts).
 OWNER_PERMISSIONS = [
     "album.read", "asset.read", "asset.view", "asset.update", "activity.read", "tag.read", "user.read",
-    "albumUser.create",
+    "albumUser.create", "albumUser.delete",
 ]
 # What a co-parent's key needs: find their own photos tagged for sending, and record deliveries on them.
 CONTRIBUTOR_PERMISSIONS = ["user.read", "asset.read", "asset.update", "tag.read"]
@@ -98,6 +99,9 @@ class Immich:
 
     async def add_album_user(self, album_id: str, user_id: str, role: str = "viewer") -> None:
         await self._call("PUT", f"/albums/{album_id}/users", json={"albumUsers": [{"userId": user_id, "role": role}]})
+
+    async def remove_album_user(self, album_id: str, user_id: str) -> None:
+        await self._call("DELETE", f"/albums/{album_id}/user/{user_id}")
 
     async def tags(self) -> list[dict]:
         """This user's tags (tags are per user in Immich)."""
@@ -206,6 +210,14 @@ class Immich:
             json={"email": email, "name": name, "password": password, "notify": False, "shouldChangePassword": False,
                   "quotaSizeInBytes": 0},
         )
+
+    async def admin_delete_user(self, user_id: str) -> None:
+        """Soft delete: Immich purges the account (and with it its likes and comments) after its deletion delay."""
+        await self._call("DELETE", f"/admin/users/{user_id}", json={"force": False})
+
+    async def shared_albums(self) -> list[dict]:
+        """Albums shared with this user (needs a session or key that may read albums)."""
+        return await self._call("GET", "/albums", params={"shared": "true"})
 
     async def admin_update_user(self, user_id: str, **fields) -> dict:
         return await self._call("PUT", f"/admin/users/{user_id}", json=fields)

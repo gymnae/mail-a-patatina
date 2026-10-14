@@ -31,8 +31,10 @@ def load_keys(path: Path) -> dict[str, str]:
     return {k.lower(): v for k, v in (yaml.safe_load(path.read_text(encoding="utf-8")) or {}).items()}
 
 
-def save_key(path: Path, email: str, key: str) -> None:
+def save_key(path: Path, email: str, key: str | None) -> None:
+    """Store a person's key, or drop it (key None)."""
     keys = load_keys(path) | {email.lower(): key}
+    keys = {k: v for k, v in keys.items() if v is not None}
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(".tmp")
     tmp.write_text(
