@@ -52,6 +52,7 @@ class Member:
     name: str
     email: str
     role: str  # owner | editor | viewer
+    managed: bool = True  # an account Mail-A-Patatina created (USER_PREFIX), not someone's own Immich account
 
 
 class People:
@@ -77,11 +78,15 @@ class People:
         prefix = self.s.user_prefix
         return name[len(prefix):] if prefix and name.startswith(prefix) else name
 
+    def is_managed(self, immich_name: str) -> bool:
+        return not self.s.user_prefix or immich_name.startswith(self.s.user_prefix)
+
     def members(self, album_users: list[dict]) -> dict[str, Member]:
         """An album's members by user id."""
         return {
             u["user"]["id"]: Member(
-                u["user"]["id"], self.display_name(u["user"]["name"]), u["user"]["email"].lower(), u["role"]
+                u["user"]["id"], self.display_name(u["user"]["name"]), u["user"]["email"].lower(), u["role"],
+                self.is_managed(u["user"]["name"]),
             )
             for u in album_users
         }

@@ -60,11 +60,27 @@
   <ul class="people">
     {% for m in members %}
     <li><b>{{ m.name }}</b> <span class="hint">{{ m.email }}</span>
-      {% if m.ready %}<span class="tag ok">ready</span>{% else %}<span class="tag">own Immich account, no email</span>{% endif %}
+      {% if m.ready %}<span class="tag ok">ready</span>{% else %}<span class="tag">own Immich account, no key yet</span>{% endif %}
       <form method="post" action="/setup/f/{{ raw.id }}/people/remove" class="inline"
             onsubmit='return confirm({{ ("Remove " ~ m.name ~ " from the album? They get nothing more, and their links stop working.") | tojson }})'>
         <input type="hidden" name="csrf" value="{{ session.csrf }}"><input type="hidden" name="user_id" value="{{ m.id }}">
-        <button class="link">remove</button></form></li>
+        <button class="link">remove</button></form>
+      {% if not m.ready %}
+      <details>
+        <summary>add key, for emails and reactions</summary>
+        <ol class="guide">
+          <li>Ask {{ m.name }} to open <a href="{{ s.immich_public_url }}/user-settings?isOpen=api-keys" target="_blank" rel="noopener">Immich → Account settings → API keys</a>,
+            create a key named <code>mail-a-patatina</code> with exactly these permissions, and send it to you:
+            <ul class="perms">{% for p in relative_permissions %}<li><code>{{ p }}</code></li>{% endfor %}</ul></li>
+          <li>Paste it here. Their account itself isn't changed.</li>
+        </ol>
+        <form method="post" action="/setup/f/{{ raw.id }}/relatives/key" class="row">
+          <input type="hidden" name="csrf" value="{{ session.csrf }}"><input type="hidden" name="user_id" value="{{ m.id }}">
+          <label>Their API key<input name="api_key" type="password" required autocomplete="off" spellcheck="false"></label>
+          <button>Add</button>
+        </form>
+      </details>
+      {% endif %}</li>
     {% endfor %}
     {% for p in raw.pending or [] %}
     <li><b>{{ p.name }}</b> <span class="hint">{{ p.email }}</span> <span class="tag wait">waiting for approval</span>
@@ -80,7 +96,8 @@
     <label>Email<input name="email" type="email" required placeholder="oma@example.com"></label>
     <button>Add</button>
   </form>
-  <p class="hint">New people get a small Immich account just for liking and commenting. The admin of this installation approves it; you'll see them as “ready” afterwards.</p>
+  <p class="hint">New people get a small Immich account just for liking and commenting. The admin of this installation approves it; you'll see them as “ready” afterwards.
+    Someone who already has an Immich account keeps it: the album is shared with it, and you add a key from their account.</p>
 </section>
 
 <section class="panel">

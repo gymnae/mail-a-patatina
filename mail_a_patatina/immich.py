@@ -83,6 +83,10 @@ class Immich:
     async def server_features(self) -> dict:
         return await self._call("GET", "/server/features")
 
+    async def users(self) -> list[dict]:
+        """The server's users, as far as this user may see them (only themselves if Immich hides other users)."""
+        return await self._call("GET", "/users")
+
     async def me(self) -> dict:
         return await self._call("GET", "/users/me")
 

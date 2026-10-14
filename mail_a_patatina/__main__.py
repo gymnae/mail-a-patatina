@@ -101,6 +101,11 @@ async def _setup_account(
         try:  # created by an earlier run of this command?
             session = await Immich.login(s.immich_url, email, password)
         except LoginFailed:
+            if wants_email and not core.people.is_managed(existing["name"]):
+                # Someone's own Immich account: share the album and leave the account alone. Their key for
+                # emails and reactions comes from them, pasted on the setup page.
+                await share_album(feed, existing["id"], role)
+                return Member(existing["id"], core.people.display_name(existing["name"]), email, role, managed=False)
             raise SystemExit(
                 f"{email} already has an Immich account. Re-run with --adopt to let Mail-A-Patatina manage it "
                 "(this resets its password, so its owner can't sign in to Immich with the old one)."
@@ -116,11 +121,7 @@ async def _setup_account(
         session = await Immich.login(s.immich_url, email, password)
 
     try:
-        try:
-            await feed.curator.add_album_user(feed.cfg.album_id, user["id"], role)
-        except httpx.HTTPStatusError as e:
-            if e.response.status_code != 400:  # 400: already shared with this user
-                raise
+        await share_album(feed, user["id"], role)
         for old in await session.api_keys():
             if old["name"] == KEY_NAME:
                 await session.delete_api_key(old["id"])
@@ -132,6 +133,18 @@ async def _setup_account(
         await session.aclose()
     await core.people.reload_keys()
     return Member(user["id"], name, email, role)
+
+
+async def share_album(feed: Feed, user_id: str, role: str) -> None:
+    try:
+        await feed.curator.add_album_user(feed.cfg.album_id, user_id, role)
+    except httpx.HTTPStatusError as e:
+        if e.response.status_code != 400:  # 400: already shared with this user
+            raise
+
+
+OWN_ACCOUNT = ("has an Immich account of their own, so the album is now shared with it. For emails and reactions, "
+               "the family adds a key from that account on the setup page (People → add key).")
 
 
 async def check(feed: Feed) -> None:
@@ -188,9 +201,11 @@ async def forget(core: Core, email: str) -> None:
             save_key(s.keys_file, email, None)
             print(f"{email} has no Immich account (anymore). Its key, if any, is removed.")
             return
-        if not s.user_prefix or not user["name"].startswith(s.user_prefix):
-            raise SystemExit(f"{email} (“{user['name']}”) wasn't created by Mail-A-Patatina, so it isn't deleted here. "
-                             "Delete it in Immich yourself if you mean to.")
+        if not core.people.is_managed(user["name"]) or not s.user_prefix:
+            save_key(s.keys_file, email, None)
+            print(f"{email} (“{user['name']}”) is someone's own Immich account, so it stays. Only its key here is "
+                  "removed; they can revoke it in Immich (Account settings → API keys).")
+            return
         # Only the person themselves can list the albums shared with them.
         async with password_login(admin):
             try:
@@ -253,7 +268,10 @@ async def approve(core: Core, feed_id: str | None, email: str | None) -> None:
                 continue
             raw["pending"] = [x for x in raw.get("pending", []) if x["email"] != p["email"]]
             core.store.save(raw)
-            print(f"  ✓ {member.name} <{member.email}> can now get “{feed.id}”")
+            if member.managed:
+                print(f"  ✓ {member.name} <{member.email}> can now get “{feed.id}”")
+            else:
+                print(f"  ✓ {member.name} <{member.email}> {OWN_ACCOUNT}")
         if raw.get("bot_requested") and not feed.bot and not email:
             try:
                 await add_account(core, feed, feed.cfg.bot_name, feed.cfg.bot_email, "viewer", False, wants_email=False)
@@ -360,6 +378,9 @@ async def main() -> None:
         if args.cmd == "add-relative":
             feed = feeds[0]
             member = await add_account(core, feed, args.name, args.email, args.role, args.adopt, wants_email=True)
+            if not member.managed:
+                print(f"{member.name} {OWN_ACCOUNT} Or re-run with --adopt to take the account over.")
+                return
             print(f"{member.name} can now get emails from “{feed.id}”. "
                   f"Their link: {feed_url(s, feed.id, make_token(s, feed.id, 'u', member.id))}")
         elif args.cmd == "add-bot":

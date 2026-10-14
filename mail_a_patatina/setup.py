@@ -28,9 +28,10 @@ from fastapi.templating import Jinja2Templates
 
 from . import dispatch, mailer
 from .config import CHAT_KINDS
-from .immich import CONTRIBUTOR_PERMISSIONS, OWNER_PERMISSIONS, Immich
+from .immich import CONTRIBUTOR_PERMISSIONS, OWNER_PERMISSIONS, RELATIVE_PERMISSIONS, Immich
 from .library import now
 from .links import LIKE, make_token, nice_date
+from .people import save_key
 from .whatsapp import Gateway, GatewayError
 
 log = logging.getLogger(__name__)
@@ -352,7 +353,8 @@ async def feed_page(request: Request, feed_id: str, msg: str = "", error: str = 
         uploaders = set(contributor_keys(feed)) | feed.unkeyed
         for m in feed.relatives():
             if m.id not in uploaders:  # co-parents, with or without a key here: listed under co-parents
-                members.append({"id": m.id, "name": m.name, "email": m.email, "ready": m.email in c.people.keys})
+                members.append({"id": m.id, "name": m.name, "email": m.email, "ready": m.email in c.people.keys,
+                                "managed": m.managed})
     s = c.settings
     channels = [k for k in ("signal", "telegram") if {"signal": s.signal_url and s.signal_number,
                                                       "telegram": s.telegram_token}[k]]
@@ -376,6 +378,7 @@ async def feed_page(request: Request, feed_id: str, msg: str = "", error: str = 
     return page(
         request, "setup/feed.html", session, raw=raw, feed=feed, members=members, channels=channels,
         coparents=coparents, skipped=skipped, coparent_permissions=CONTRIBUTOR_PERMISSIONS,
+        relative_permissions=RELATIVE_PERMISSIONS,
         whatsapp=whatsapp, whatsapp_down=whatsapp_down,
         timezones=TIMEZONES, msg=msg, error=error, link=f"{s.public_url}/{feed_id}/",
         moments=len(feed.library.ordered) if feed else 0, bot_ready=bool(feed and feed.bot),
@@ -496,7 +499,10 @@ async def remove_person(request: Request, feed_id: str, csrf: str = Form(), user
         return back(feed_id, error="Your Immich key may not remove people (albumUser.delete is missing). "
                                    "Replace it under “Immich key”, or remove them in Immich: album → ⋮ → Options.")
     await feed.refresh_members()
-    if member.email in c.people.keys and not still_needed(c, member.email):
+    if member.email in c.people.keys and not still_needed(c, member.email) and not member.managed:
+        save_key(c.settings.keys_file, member.email, None)  # their own account stays; only our key goes
+        await c.people.reload_keys()
+    elif member.email in c.people.keys and not still_needed(c, member.email):
         # Their account and key are of no use to anyone now; deleting accounts needs the admin.
         await notify_install_admins(
             request, f"{member.name} <{member.email}> is in no family's album anymore",
@@ -686,6 +692,22 @@ async def add_relative(request: Request, feed_id: str, csrf: str = Form(), name:
     feed = core(request).feeds.get(feed_id)
     if feed and feed.by_email(email):
         return back(feed_id, msg=f"{email} is already part of this album.")
+    if feed:
+        # Someone with an Immich account of their own needs no new account and so no approval: share the
+        # album with it. (Only works if Immich shows other users to non-admins; else `approve` does it.)
+        try:
+            user = next((u for u in await feed.curator.users() if u["email"].lower() == email), None)
+        except httpx.HTTPError:
+            user = None
+        if user and not core(request).people.is_managed(user["name"]):
+            try:
+                await feed.curator.add_album_user(feed.cfg.album_id, user["id"], "viewer")
+            except httpx.HTTPStatusError as e:
+                if e.response.status_code != 400:  # 400: already shared
+                    return back(feed_id, error=f"Sharing the album with {email} didn't work: {e}")
+            await feed.refresh_members()
+            return back(feed_id, msg=f"{user['name']} has an Immich account already, so the album is now shared with it. "
+                                     "For emails and reactions, add a key from their account under People.")
     pending = raw.setdefault("pending", [])
     if any(p["email"] == email for p in pending):
         return back(feed_id, msg=f"{email} is already waiting for approval.")
@@ -693,6 +715,27 @@ async def add_relative(request: Request, feed_id: str, csrf: str = Form(), name:
     core(request).store.save(raw)
     await notify_install_admins(request, f"{raw['title']}: {name} <{email}> is waiting for approval")
     return back(feed_id, msg=f"{name} is waiting for the admin's approval. You'll see them here once they're added.")
+
+
+@router.post("/f/{feed_id}/relatives/key")
+async def relative_key(request: Request, feed_id: str, csrf: str = Form(), user_id: str = Form(), api_key: str = Form()):
+    """For relatives with an Immich account of their own: a key they created in it, so Mail-A-Patatina can
+    email them and post their likes and comments, without taking over the account."""
+    session = require(request, csrf)
+    owned(request, session, feed_id)
+    c = core(request)
+    feed = c.feeds.get(feed_id)
+    member = feed.members.get(user_id) if feed else None
+    if member is None or member.role == "owner" or member.email == feed.cfg.bot_email:
+        return back(feed_id)
+    me, problem = await check_key(request, api_key.strip(), RELATIVE_PERMISSIONS)
+    if problem:
+        return back(feed_id, error=problem)
+    if me["id"] != user_id:
+        return back(feed_id, error=f"This key belongs to {me['email']}, not {member.email}.")
+    save_key(c.settings.keys_file, member.email, api_key.strip())
+    await c.people.reload_keys()
+    return back(feed_id, msg=f"{member.name} is ready: they get the daily email and can like and comment.")
 
 
 @router.post("/f/{feed_id}/relatives/cancel")
