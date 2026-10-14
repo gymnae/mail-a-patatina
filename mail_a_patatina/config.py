@@ -63,11 +63,10 @@ class Settings:
     smtp_from: str
     whatsapp_url: str
     whatsapp_auth: str
-    whatsapp_device: str
+    whatsapp_device: str  # the gateway device of families defined in .env/feeds.yml; empty: its only device
     signal_url: str
     signal_number: str
     telegram_token: str
-    whatsapp_number: str  # shown on the setup page: "add this number to your group"
 
     @property
     def secure_cookies(self) -> bool:
@@ -110,7 +109,6 @@ class Settings:
             signal_url=env("SIGNAL_URL", "").rstrip("/"),
             signal_number=env("SIGNAL_NUMBER", ""),
             telegram_token=env("TELEGRAM_BOT_TOKEN", ""),
-            whatsapp_number=env("WHATSAPP_NUMBER", ""),
         )
         if len(settings.secret_key) < 32:
             raise SystemExit("SECRET_KEY must be at least 32 characters (e.g. `openssl rand -base64 48`)")
@@ -194,6 +192,9 @@ class FeedConfig:
     bot_name: str
     smtp_from: str
     admin_emails: list[str]
+    # GOWA device that sends this family's WhatsApp messages. None: no account linked yet;
+    # "": the gateway's only device (no X-Device-Id header).
+    whatsapp_device: str | None
     chats: list[ChatSpec] = field(default_factory=list)
 
 
@@ -235,6 +236,7 @@ def feed_config(raw: dict, settings: Settings) -> FeedConfig:
         bot_name=str(raw.get("bot_name") or env("BOT_NAME", "Family chat")),
         smtp_from=str(raw.get("smtp_from") or settings.smtp_from),
         admin_emails=_list(raw.get("admin_emails", env("ADMIN_EMAILS"))),
+        whatsapp_device=None if raw.get("whatsapp_device") is None else str(raw["whatsapp_device"]).strip(),
         chats=_chats(raw.get("chats")),
     )
 
@@ -245,7 +247,8 @@ def load_feeds(settings: Settings) -> list[FeedConfig]:
 
     if settings.feeds_file.exists():
         data = yaml.safe_load(settings.feeds_file.read_text(encoding="utf-8")) or {}
-        feeds = [feed_config(raw, settings) for raw in data.get("feeds") or []]
+        feeds = [feed_config({"whatsapp_device": settings.whatsapp_device} | raw, settings)
+                 for raw in data.get("feeds") or []]
     elif os.environ.get("ALBUM_ID"):
         # Single-family setup straight from .env (plus the optional chats file).
         chats_file = Path(os.environ.get("CHATS_FILE", "/config/chats.yml"))
@@ -256,6 +259,7 @@ def load_feeds(settings: Settings) -> list[FeedConfig]:
             "api_key": os.environ.get("IMMICH_API_KEY"),
             "contributor_keys": os.environ.get("IMMICH_CONTRIBUTOR_KEYS"),
             "bot_email": os.environ.get("BOT_EMAIL"),
+            "whatsapp_device": settings.whatsapp_device,
             "chats": chats,
         }, settings)]
     else:

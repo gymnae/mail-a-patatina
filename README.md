@@ -70,7 +70,9 @@ Everyone who can sign in to Immich can set up their own family feed at `PUBLIC_U
 3. **Album and rules:** pick one of your own albums, a title, the sending time and timezone, digest or one-a-day, whether only captioned photos go out, and whether you want an email when someone comments.
 4. **People and chats:**
    - Add relatives by name and email.
-   - Connect a WhatsApp or Signal group by adding the installation's number to it and typing the group's exact name. The page never lists the number's groups, because those include other families' groups. Telegram groups are connected by chat id.
+   - **WhatsApp:** link a WhatsApp account of the family's own, by scanning a QR code or typing a pairing code on the phone, like WhatsApp Web. Moments are posted from that account, and its groups are offered to pick from. Use a spare number rather than a personal one, because the server holds the session.
+   - **Signal:** add the installation's number to the group and type the group's exact name. The page never lists the number's groups, because those include other families' groups.
+   - **Telegram:** add the installation's bot and enter the group's chat id.
 5. **Test email**, changing the rules, replacing the key, or deleting the feed, whenever you like.
 
 **Relatives wait for the admin.** Creating an Immich account needs admin rights, and the running service doesn't hold any:
@@ -132,15 +134,17 @@ The admin only sets up the installation; families do the rest on the setup page.
 
 ### Messenger gateways (admin)
 
-Families connect their own groups on the setup page. The admin runs the gateways, one number for the whole installation.
+Families connect their own groups on the setup page. The admin runs the gateways.
 
 #### WhatsApp (GOWA)
 
-1. Set `WHATSAPP_AUTH` in `.env`, then start the gateway with `docker compose --profile whatsapp up -d`.
-2. Open `http://127.0.0.1:3000` on the Docker host. On the phone, go to *WhatsApp → Linked devices* and scan the QR code.
-3. Set `WHATSAPP_NUMBER` in `.env`, so families see which number to add to their group.
+Every family sends from a WhatsApp account under its own control. The installation has no WhatsApp number.
 
-⚠️ WhatsApp has no official API for posting to groups. GOWA acts like WhatsApp Web on a linked phone, which is against WhatsApp's terms and can get the number banned. Use a spare number, and keep the volume to these few messages a day.
+1. Set `WHATSAPP_AUTH` in `.env`, then start the gateway with `docker compose --profile whatsapp up -d`.
+2. That's all for the admin. Families link their accounts on the setup page, and GOWA keeps one session ("device") per family, named after the feed. Unlinking or deleting the feed removes the session.
+3. **Families defined in `.env` or `feeds.yml`** link with `docker compose run --rm app python -m mail_a_patatina whatsapp-link --feed <id> +491701234567`, which prints a code to type in on that phone. `whatsapp-groups --feed <id>` then lists the chat ids of its groups.
+
+⚠️ WhatsApp has no official API for posting to groups. GOWA acts like WhatsApp Web on a linked phone, which is against WhatsApp's terms and can get the number banned. Tell families to use a spare number, not their personal one. The server can also read that account's chats. Keep the volume to these few messages a day.
 
 #### Signal and Telegram
 

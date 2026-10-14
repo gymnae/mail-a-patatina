@@ -1,6 +1,6 @@
 """Chat channels. Each one posts a single photo with a caption to a chat or group.
 
-WhatsApp goes through a GOWA sidecar, Signal through signal-cli-rest-api, Telegram through the Bot API.
+WhatsApp goes through a GOWA sidecar (each family on its own linked account), Signal through signal-cli-rest-api, Telegram through the Bot API.
 """
 
 from __future__ import annotations
@@ -9,27 +9,18 @@ import base64
 
 import httpx
 
-from .config import Settings
+from .config import FeedConfig, Settings
+from .whatsapp import Gateway
 
 
-async def send_whatsapp(s: Settings, http: httpx.AsyncClient, chat_id: str, jpeg: bytes, caption: str) -> None:
-    if not s.whatsapp_url:
-        raise RuntimeError("WHATSAPP_URL is not configured")
-    user, _, password = s.whatsapp_auth.partition(":")
-    r = await http.post(
-        f"{s.whatsapp_url}/send/image",
-        data={"phone": chat_id, "caption": caption, "compress": "false"},
-        files={"image": ("photo.jpg", jpeg, "image/jpeg")},
-        headers={"X-Device-Id": s.whatsapp_device} if s.whatsapp_device else {},
-        auth=(user, password) if s.whatsapp_auth else None,
-    )
-    r.raise_for_status()
-    body = r.json()
-    if body.get("code") not in (None, "SUCCESS"):
-        raise RuntimeError(f"WhatsApp gateway: {body.get('code')}: {body.get('message')}")
+async def send_whatsapp(s: Settings, http: httpx.AsyncClient, feed: FeedConfig, chat_id: str, jpeg: bytes,
+                        caption: str) -> None:
+    if feed.whatsapp_device is None:
+        raise RuntimeError("No WhatsApp account is linked to this feed (setup page → Family chats)")
+    await Gateway(s, http).send_image(feed.whatsapp_device, chat_id, jpeg, caption)
 
 
-async def send_signal(s: Settings, http: httpx.AsyncClient, chat_id: str, jpeg: bytes, caption: str) -> None:
+async def send_signal(s: Settings, http: httpx.AsyncClient, feed: FeedConfig, chat_id: str, jpeg: bytes, caption: str) -> None:
     if not (s.signal_url and s.signal_number):
         raise RuntimeError("SIGNAL_URL and SIGNAL_NUMBER must be configured")
     attachment = "data:image/jpeg;filename=photo.jpg;base64," + base64.b64encode(jpeg).decode()
@@ -40,7 +31,7 @@ async def send_signal(s: Settings, http: httpx.AsyncClient, chat_id: str, jpeg: 
     r.raise_for_status()
 
 
-async def send_telegram(s: Settings, http: httpx.AsyncClient, chat_id: str, jpeg: bytes, caption: str) -> None:
+async def send_telegram(s: Settings, http: httpx.AsyncClient, feed: FeedConfig, chat_id: str, jpeg: bytes, caption: str) -> None:
     if not s.telegram_token:
         raise RuntimeError("TELEGRAM_BOT_TOKEN is not configured")
     r = await http.post(

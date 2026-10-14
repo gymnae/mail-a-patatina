@@ -1,0 +1,17 @@
+{% extends "setup/layout.html" %}
+{% block head %}<meta http-equiv="refresh" content="5">{% endblock %}
+{% block page_title %}Link WhatsApp{% endblock %}
+{% block content %}
+<h1>Link WhatsApp</h1>
+<section class="panel">
+  {% if kind == "code" %}
+  <p>On the phone with that number: <b>WhatsApp → Settings → Linked devices → Link a device → Link with phone number instead</b>, then enter:</p>
+  <p class="center"><b style="font-size: 2rem; letter-spacing: .15em">{{ value }}</b></p>
+  {% else %}
+  <p>On your family's phone: <b>WhatsApp → Settings → Linked devices → Link a device</b>, then scan this code.</p>
+  <p class="center"><img src="{{ value }}" alt="QR code for linking WhatsApp" width="264" height="264"></p>
+  {% endif %}
+  <p class="hint">This page refreshes by itself and takes you back once the phone is linked.</p>
+</section>
+<p><a href="/setup/f/{{ raw.id }}">Cancel</a></p>
+{% endblock %}

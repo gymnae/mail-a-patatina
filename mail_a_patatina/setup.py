@@ -31,6 +31,7 @@ from .config import CHAT_KINDS
 from .immich import OWNER_PERMISSIONS, Immich
 from .library import now
 from .links import LIKE, make_token, nice_date
+from .whatsapp import Gateway, GatewayError
 
 log = logging.getLogger(__name__)
 router = APIRouter(prefix="/setup")
@@ -55,6 +56,9 @@ class SetupSession:
 
 
 SESSIONS: dict[str, SetupSession] = {}
+# WhatsApp device -> (kind "qr" | "code", PNG data URI or pairing code, monotonic expiry), while a family links its account
+LINKING: dict[str, tuple[str, str, float]] = {}
+PHONE = re.compile(r"^\+?[0-9 ()/-]{6,24}$")
 PENDING_LOGINS: dict[str, tuple[str, float]] = {}  # OIDC state -> (PKCE verifier, started)
 _discovery: dict | None = None
 
@@ -337,10 +341,23 @@ async def feed_page(request: Request, feed_id: str, msg: str = "", error: str = 
         for m in feed.relatives():
             members.append({"name": m.name, "email": m.email, "ready": m.email in c.people.keys})
     s = c.settings
-    channels = [k for k in CHAT_KINDS if {"whatsapp": s.whatsapp_url, "signal": s.signal_url and s.signal_number,
-                                          "telegram": s.telegram_token}[k]]
+    channels = [k for k in ("signal", "telegram") if {"signal": s.signal_url and s.signal_number,
+                                                      "telegram": s.telegram_token}[k]]
+    whatsapp, whatsapp_down = None, False  # the family's own linked account, with its groups
+    if s.whatsapp_url and raw.get("whatsapp_device"):
+        try:
+            gateway = Gateway(s, c.http)
+            whatsapp = await gateway.account(raw["whatsapp_device"])
+            if whatsapp:
+                connected = {str(ch["chat_id"]) for ch in raw.get("chats", []) if ch["channel"] == "whatsapp"}
+                whatsapp["groups"] = sorted(((name or jid, jid) for name, jid in await gateway.groups(raw["whatsapp_device"])
+                                             if jid not in connected), key=lambda g: g[0].casefold())
+        except (httpx.HTTPError, GatewayError):
+            log.exception("WhatsApp gateway for %s", feed_id)
+            whatsapp_down = True
     return page(
         request, "setup/feed.html", session, raw=raw, feed=feed, members=members, channels=channels,
+        whatsapp=whatsapp, whatsapp_down=whatsapp_down,
         timezones=TIMEZONES, msg=msg, error=error, link=f"{s.public_url}/{feed_id}/",
         moments=len(feed.library.ordered) if feed else 0, bot_ready=bool(feed and feed.bot),
     )
@@ -381,23 +398,15 @@ async def replace_key(request: Request, feed_id: str, csrf: str = Form(), api_ke
     return back(feed_id, msg="Key replaced. You can now revoke the old one in Immich.")
 
 
-async def find_group(request: Request, channel: str, name: str) -> tuple[str | None, str | None]:
-    """Look up the chat id of the one group with exactly this name. Other groups the shared number
-    is in are never shown, because they belong to other families."""
+async def find_signal_group(request: Request, name: str) -> tuple[str | None, str | None]:
+    """Look up the chat id of the one group with exactly this name. Other groups the installation's
+    Signal number is in are never shown, because they belong to other families."""
     s = settings(request)
     wanted = name.strip().casefold()
     async with httpx.AsyncClient(timeout=30) as http:
-        if channel == "whatsapp":
-            user, _, password = s.whatsapp_auth.partition(":")
-            r = await http.get(f"{s.whatsapp_url}/user/my/groups",
-                               headers={"X-Device-Id": s.whatsapp_device} if s.whatsapp_device else {},
-                               auth=(user, password) if s.whatsapp_auth else None)
-            r.raise_for_status()
-            groups = [(g.get("Name", ""), g.get("JID")) for g in (r.json().get("results") or {}).get("data") or []]
-        else:
-            r = await http.get(f"{s.signal_url}/v1/groups/{s.signal_number}")
-            r.raise_for_status()
-            groups = [(g.get("name", ""), g.get("id")) for g in r.json()]
+        r = await http.get(f"{s.signal_url}/v1/groups/{s.signal_number}")
+        r.raise_for_status()
+        groups = [(g.get("name", ""), g.get("id")) for g in r.json()]
     matches = [gid for gname, gid in groups if gname.strip().casefold() == wanted and gid]
     if not matches:
         return None, "No group with exactly that name. Is the family number already a member of the group?"
@@ -413,21 +422,35 @@ async def add_chat(request: Request, feed_id: str, csrf: str = Form(), channel: 
     raw = owned(request, session, feed_id)
     if channel not in CHAT_KINDS:
         return back(feed_id, error="Pick a messenger.")
+    name = (group_name or chat_id).strip()
     if channel == "telegram":
         address = chat_id.strip()
         if not re.match(r"^-?\d{5,20}$", address):
             return back(feed_id, error="A Telegram chat id is a number like -1001234567890.")
+    elif channel == "whatsapp":
+        # Only a group of the family's own linked account can be picked.
+        if not raw.get("whatsapp_device"):
+            return back(feed_id, error="Link your family's WhatsApp account first.")
+        try:
+            groups = dict((jid, gname) for gname, jid in await Gateway(settings(request), core(request).http)
+                          .groups(raw["whatsapp_device"]))
+        except (httpx.HTTPError, GatewayError):
+            return back(feed_id, error="The WhatsApp gateway isn't reachable right now. Try again later.")
+        address = chat_id.strip()
+        if address not in groups:
+            return back(feed_id, error="Pick one of your WhatsApp groups.")
+        name = groups[address] or address
     else:
         try:
-            address, problem = await find_group(request, channel, group_name)
+            address, problem = await find_signal_group(request, group_name)
         except httpx.HTTPError:
-            return back(feed_id, error=f"The {channel} gateway isn't reachable right now. Try again later.")
+            return back(feed_id, error="The Signal gateway isn't reachable right now. Try again later.")
         if problem:
             return back(feed_id, error=problem)
     chats = raw.setdefault("chats", [])
     if any(c["channel"] == channel and str(c["chat_id"]) == address for c in chats):
         return back(feed_id, msg="That group is already connected.")
-    chats.append({"name": (group_name or chat_id).strip()[:80], "channel": channel, "chat_id": address})
+    chats.append({"name": name[:80], "channel": channel, "chat_id": address})
     feed = core(request).feeds.get(feed_id)
     if not (feed and feed.bot) and not raw.get("bot_requested"):
         raw["bot_requested"] = now()  # group visitors comment through a bot account; the admin creates it
@@ -445,6 +468,99 @@ async def remove_chat(request: Request, feed_id: str, csrf: str = Form(), chat_i
     core(request).store.save(raw)
     await core(request).apply_stored(feed_id)
     return back(feed_id, msg="Group disconnected.")
+
+
+# --- the family's own WhatsApp account ------------------------------------------------
+
+
+async def whatsapp_device(request: Request, raw: dict) -> str:
+    """The family's device on the gateway (one per family, named after the feed), created if needed."""
+    if not settings(request).whatsapp_url:
+        raise HTTPException(404)
+    device = raw["id"]
+    await Gateway(settings(request), core(request).http).ensure_device(device)
+    if raw.get("whatsapp_device") != device:
+        raw["whatsapp_device"] = device
+        core(request).store.save(raw)
+        await core(request).apply_stored(raw["id"])
+    return device
+
+
+@router.post("/f/{feed_id}/whatsapp/link")
+async def whatsapp_link(request: Request, feed_id: str, csrf: str = Form()):
+    session = require(request, csrf)
+    raw = owned(request, session, feed_id)
+    try:
+        await whatsapp_device(request, raw)
+    except (httpx.HTTPError, GatewayError):
+        log.exception("WhatsApp gateway for %s", feed_id)
+        return back(feed_id, error="The WhatsApp gateway isn't reachable right now. Try again later.")
+    return RedirectResponse(f"/setup/f/{feed_id}/whatsapp", status_code=303)
+
+
+@router.get("/f/{feed_id}/whatsapp", response_class=HTMLResponse)
+async def whatsapp_page(request: Request, feed_id: str):
+    """Shows a QR code (or a pairing code) until the family's phone has linked the account. The page reloads
+    itself every few seconds; a new QR code is fetched only when the old one has expired."""
+    session = require(request)
+    raw = owned(request, session, feed_id)
+    device = raw.get("whatsapp_device")
+    if not device:
+        return back(feed_id)
+    gateway = Gateway(settings(request), core(request).http)
+    try:
+        account = await gateway.account(device)
+        if account:
+            LINKING.pop(device, None)
+            return back(feed_id, msg=f"WhatsApp linked: {account['name'] or account['phone'] or 'done'}.")
+        kind, value, expires = LINKING.get(device, ("", "", 0.0))
+        if time.monotonic() > expires:
+            png, seconds = await gateway.qr(device)
+            kind, value = "qr", "data:image/png;base64," + base64.b64encode(png).decode()
+            LINKING[device] = (kind, value, time.monotonic() + max(seconds - 3, 5))
+    except (httpx.HTTPError, GatewayError) as e:
+        log.exception("WhatsApp linking for %s", feed_id)
+        return back(feed_id, error=f"Linking WhatsApp didn't work: {e}")
+    return page(request, "setup/whatsapp.html", session, raw=raw, kind=kind, value=value)
+
+
+@router.post("/f/{feed_id}/whatsapp/code")
+async def whatsapp_code(request: Request, feed_id: str, csrf: str = Form(), phone: str = Form()):
+    """For linking on the very phone that shows this page, where there is nothing to scan."""
+    session = require(request, csrf)
+    raw = owned(request, session, feed_id)
+    if not PHONE.match(phone.strip()):
+        return back(feed_id, error="Enter the phone number with country code, like +49 170 1234567.")
+    try:
+        device = await whatsapp_device(request, raw)
+        code = await Gateway(settings(request), core(request).http).pair_code(device, re.sub(r"\D", "", phone))
+    except (httpx.HTTPError, GatewayError) as e:
+        log.exception("WhatsApp pairing code for %s", feed_id)
+        return back(feed_id, error=f"Getting a pairing code didn't work: {e}")
+    LINKING[device] = ("code", code, time.monotonic() + 160)
+    return RedirectResponse(f"/setup/f/{feed_id}/whatsapp", status_code=303)
+
+
+@router.post("/f/{feed_id}/whatsapp/unlink")
+async def whatsapp_unlink(request: Request, feed_id: str, csrf: str = Form()):
+    session = require(request, csrf)
+    raw = owned(request, session, feed_id)
+    device = raw.pop("whatsapp_device", None)
+    if device:
+        LINKING.pop(device, None)
+        try:
+            await Gateway(settings(request), core(request).http).remove(device)
+        except (httpx.HTTPError, GatewayError):
+            log.exception("Removing WhatsApp device of %s", feed_id)
+            return back(feed_id, error="The WhatsApp gateway isn't reachable right now. Try again later.")
+    raw["chats"] = [c for c in raw.get("chats", []) if c["channel"] != "whatsapp"]
+    core(request).store.save(raw)
+    await core(request).apply_stored(feed_id)
+    return back(feed_id, msg="WhatsApp unlinked, and its groups disconnected. "
+                             "It also disappears from Linked devices on the phone.")
+
+
+# --- relatives -------------------------------------------------------------------------
 
 
 @router.post("/f/{feed_id}/relatives/add")
@@ -501,6 +617,11 @@ async def delete_feed(request: Request, feed_id: str, csrf: str = Form(), confir
     raw = owned(request, session, feed_id)
     if confirm.strip() != raw["id"]:
         return back(feed_id, error=f"Type {raw['id']} to confirm.")
+    if raw.get("whatsapp_device"):
+        try:
+            await Gateway(settings(request), core(request).http).remove(raw["whatsapp_device"])
+        except (httpx.HTTPError, GatewayError):
+            log.exception("Removing WhatsApp device of %s", feed_id)
     core(request).store.delete(feed_id)
     await core(request).apply_stored(feed_id)
     log.info("Feed %s deleted by %s", feed_id, session.email)

@@ -92,7 +92,7 @@ async def send_chat(feed: Feed, target: Target, entries: list[Entry]) -> None:
     send = SENDERS[target.kind]
     for entry in entries:
         jpeg = await core.media.jpeg(feed.curator, entry.asset_id, "preview")
-        await send(core.settings, core.http, target.address, jpeg, chat_caption(feed, target, entry))
+        await send(core.settings, core.http, feed.cfg, target.address, jpeg, chat_caption(feed, target, entry))
         await _record(feed, target, [entry])  # per message, so a failure halfway doesn't resend the first ones
 
 

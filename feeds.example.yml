@@ -16,10 +16,11 @@ feeds:
     # smtp_from: "Die Müllers <family@example.com>"
     # admin_emails: [mama@example.com]
     # bot_name: Müller WhatsApp     # the account group-chat visitors post as (create it with add-bot --feed mueller)
+    # whatsapp_device: mueller       # the GOWA device linked to this family's WhatsApp (default: WHATSAPP_DEVICE_ID)
     chats:
       - name: Family WhatsApp
         channel: whatsapp
-        chat_id: "120363000000000000@g.us"
+        chat_id: "120363000000000000@g.us"   # python -m mail_a_patatina whatsapp-groups --feed mueller
 
   - id: schmidt
     title: Schmidts

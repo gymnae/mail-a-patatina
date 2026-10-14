@@ -17,7 +17,7 @@ services:
     # networks: [default, immich]
 
   # WhatsApp gateway (GOWA). Start with: docker compose --profile whatsapp up -d
-  # Pair once by opening http://127.0.0.1:3000 and scanning the QR code with WhatsApp > Linked devices.
+  # Families link their own WhatsApp accounts on the setup page; GOWA keeps one session per family.
   whatsapp:
     profiles: [whatsapp]
     image: aldinokemal2104/go-whatsapp-web-multidevice:latest
@@ -27,8 +27,9 @@ services:
       - APP_BASIC_AUTH=${WHATSAPP_AUTH}
     volumes:
       - ./whatsapp:/app/storages
-    ports:
-      - "127.0.0.1:3000:3000" # only for pairing from this machine
+    # Not needed by families; uncomment to use GOWA's own web UI from this machine.
+    # ports:
+    #   - "127.0.0.1:3000:3000"
 
   # Signal gateway. Start with: docker compose --profile signal up -d
   # Link once via http://127.0.0.1:8081/v1/qrcodelink?device_name=family-feed

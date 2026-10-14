@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import argparse
 import asyncio
-import json
 import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
@@ -17,6 +16,7 @@ from .core import Core, Feed
 from .immich import KEY_NAME, RELATIVE_PERMISSIONS, Immich, LoginFailed
 from .links import derived_password, feed_url, make_token
 from .people import Member, save_key
+from .whatsapp import Gateway
 
 
 MANUAL_SWITCH = (
@@ -236,7 +236,9 @@ async def main() -> None:
     test = sub.add_parser("send-test", help="email the latest moments to one relative, without marking them sent")
     test.add_argument("email")
     test.add_argument("-n", type=int, default=3, help="number of moments (default 3)")
-    sub.add_parser("whatsapp-groups", help="list WhatsApp groups to find chat ids")
+    wa = sub.add_parser("whatsapp-link", help="link a WhatsApp account to a feed defined in .env/feeds.yml (prints a code)")
+    wa.add_argument("phone", help="the account's number with country code, e.g. +491701234567")
+    sub.add_parser("whatsapp-groups", help="list the WhatsApp groups of a feed's account (--feed) to find chat ids")
     sub.add_parser("pending", help="show relatives and group-chat accounts waiting for approval")
     app = sub.add_parser("approve", help="create the waiting accounts (all, or one feed with --feed, or one EMAIL)")
     app.add_argument("email", nargs="?")
@@ -249,15 +251,22 @@ async def main() -> None:
     core = Core(Settings.from_env())
     s = core.settings
     try:
+        if args.cmd == "whatsapp-link":
+            feed = core.feed(args.feed)
+            device = feed.cfg.whatsapp_device or feed.id
+            gateway = Gateway(s, core.http)
+            await gateway.ensure_device(device)
+            code = await gateway.pair_code(device, "".join(c for c in args.phone if c.isdigit()))
+            print(f"On that phone: WhatsApp → Linked devices → Link a device → Link with phone number instead, enter {code}")
+            if feed.cfg.whatsapp_device != device:
+                print(f"Then set whatsapp_device: {device} for “{feed.id}” in feeds.yml (or WHATSAPP_DEVICE_ID={device} in .env)")
+            return
         if args.cmd == "whatsapp-groups":
-            user, _, password = s.whatsapp_auth.partition(":")
-            r = await core.http.get(
-                f"{s.whatsapp_url}/user/my/groups",
-                headers={"X-Device-Id": s.whatsapp_device} if s.whatsapp_device else {},
-                auth=(user, password) if s.whatsapp_auth else None,
-            )
-            r.raise_for_status()
-            print(json.dumps(r.json(), indent=2, ensure_ascii=False))
+            device = core.feed(args.feed).cfg.whatsapp_device
+            if device is None:
+                raise SystemExit("That feed has no WhatsApp account linked yet")
+            for name, jid in await Gateway(s, core.http).groups(device):
+                print(f"{jid}  {name}")
             return
 
         if args.cmd == "pending":

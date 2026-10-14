@@ -32,7 +32,7 @@
 
 <section class="panel">
   <h2>Family chats</h2>
-  {% if not channels %}
+  {% if not s.whatsapp_url and not channels %}
   <p class="hint">No messenger is set up on this installation.</p>
   {% else %}
   <ul class="people">
@@ -46,19 +46,56 @@
     {% endfor %}
   </ul>
   {% if raw.chats and not bot_ready %}<p class="hint">Comments from chat links wait for the admin to approve the group account; until then, chat visitors can look but not comment.</p>{% endif %}
+
+  {% if s.whatsapp_url %}
+  <h3>WhatsApp</h3>
+  {% if whatsapp %}
+  <div>Sending from <b>{{ whatsapp.name or "+" ~ whatsapp.phone }}</b>{% if whatsapp.name and whatsapp.phone %} <span class="hint">+{{ whatsapp.phone }}</span>{% endif %}
+    <form method="post" action="/setup/f/{{ raw.id }}/whatsapp/unlink" class="inline">
+      <input type="hidden" name="csrf" value="{{ session.csrf }}"><button class="link">unlink</button></form></div>
+  {% if whatsapp.groups %}
+  <form method="post" action="/setup/f/{{ raw.id }}/chats/add" class="row">
+    <input type="hidden" name="csrf" value="{{ session.csrf }}"><input type="hidden" name="channel" value="whatsapp">
+    <label>Group<select name="chat_id">{% for name, jid in whatsapp.groups %}<option value="{{ jid }}">{{ name }}</option>{% endfor %}</select></label>
+    <button>Connect group</button>
+  </form>
+  {% else %}
+  <p class="hint">Add this WhatsApp account to your family group, then reload this page to pick the group.</p>
+  {% endif %}
+  {% elif whatsapp_down %}
+  <p class="hint">The WhatsApp gateway isn't reachable right now. Try again later.</p>
+  {% else %}
+  <p class="hint">Moments are posted from a WhatsApp account of your family's, linked here like WhatsApp Web.
+    Use a spare number (a second SIM or eSIM) rather than your personal one: this installation's server holds the
+    session and could read that account's chats, and WhatsApp may ban numbers that post through unofficial tools.</p>
+  <form method="post" action="/setup/f/{{ raw.id }}/whatsapp/link" class="stack">
+    <input type="hidden" name="csrf" value="{{ session.csrf }}">
+    <button>Show a QR code to scan</button>
+  </form>
+  <form method="post" action="/setup/f/{{ raw.id }}/whatsapp/code" class="row">
+    <input type="hidden" name="csrf" value="{{ session.csrf }}">
+    <label>Or, on that phone itself, its number<input name="phone" type="tel" required placeholder="+49 170 1234567" autocomplete="tel"></label>
+    <button>Get a code to type in</button>
+  </form>
+  {% endif %}
+  {% endif %}
+
+  {% if channels %}
+  <h3>{{ channels | map("title") | join(" or ") }}</h3>
   <form method="post" action="/setup/f/{{ raw.id }}/chats/add" class="stack">
     <input type="hidden" name="csrf" value="{{ session.csrf }}">
-    <label>Messenger<select name="channel">{% for k in channels %}<option value="{{ k }}">{{ {"whatsapp": "WhatsApp", "signal": "Signal", "telegram": "Telegram"}[k] }}</option>{% endfor %}</select></label>
+    <label>Messenger<select name="channel">{% for k in channels %}<option value="{{ k }}">{{ k | title }}</option>{% endfor %}</select></label>
     <ol class="guide">
-      <li>Add the family number{% if s.whatsapp_number %} <b>{{ s.whatsapp_number }}</b> (WhatsApp){% endif %}{% if s.signal_number %} / <b>{{ s.signal_number }}</b> (Signal){% endif %} to your group. For Telegram, add the bot instead.</li>
-      <li>WhatsApp and Signal: type the group's exact name. Telegram: enter the group's chat id.</li>
+      {% if "signal" in channels %}<li>Signal: add the installation's number <b>{{ s.signal_number }}</b> to your group and type the group's exact name.</li>{% endif %}
+      {% if "telegram" in channels %}<li>Telegram: add the installation's bot to your group and enter the group's chat id.</li>{% endif %}
     </ol>
     <div class="row">
-      <label>Group name<input name="group_name" maxlength="80" placeholder="Familie Falk"></label>
-      <label>or Telegram chat id<input name="chat_id" maxlength="24" placeholder="-1001234567890"></label>
+      {% if "signal" in channels %}<label>Group name<input name="group_name" maxlength="80" placeholder="Familie Falk"></label>{% endif %}
+      {% if "telegram" in channels %}<label>Telegram chat id<input name="chat_id" maxlength="24" placeholder="-1001234567890"></label>{% endif %}
     </div>
     <button>Connect group</button>
   </form>
+  {% endif %}
   {% endif %}
 </section>
 
