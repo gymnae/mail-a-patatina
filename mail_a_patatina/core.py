@@ -59,6 +59,11 @@ class Feed:
             client.user_id = me["id"]
             self.writers[me["id"]] = client
 
+    async def refresh_members(self) -> None:
+        """Just the album's member list, e.g. after the admin approved relatives from the CLI."""
+        album = await self.curator.album(self.cfg.album_id)
+        self.members = self.core.people.members(album.get("albumUsers") or [])
+
     async def sync(self) -> None:
         async with self.lock:
             await sync.run(self)

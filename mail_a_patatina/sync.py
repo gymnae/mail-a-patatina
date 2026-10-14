@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
 from collections import defaultdict
 from typing import TYPE_CHECKING
 
@@ -14,6 +15,20 @@ if TYPE_CHECKING:
 
 log = logging.getLogger(__name__)
 _warned_owners: set[tuple[str, str]] = set()
+
+# Descriptions that cameras and apps write into EXIF, which Immich imports as if someone had typed them.
+CAMERA_DEFAULTS = {"olympus digital camera", "sony dsc", "default", "image", "picture", "dcim", "digital camera",
+                   "samsung", "lg electronics", "minolta dsc", "kodak digital still camera", "exif_jpeg_picture"}
+MACHINE_TEXT = re.compile(r"^[A-Za-z0-9+/=_-]{24,}$")  # e.g. Snapchat's base64 metadata blob
+
+
+def human_caption(description: str | None) -> str:
+    """The description, unless it was written by a camera or app rather than a person."""
+    text = (description or "").strip()
+    machine = MACHINE_TEXT.match(text) and all(re.search(c, text) for c in ("[0-9]", "[A-Z]", "[a-z]"))
+    if text.casefold() in CAMERA_DEFAULTS or machine:
+        return ""
+    return text
 
 
 async def run(feed: Feed) -> None:
@@ -29,7 +44,7 @@ async def run(feed: Feed) -> None:
     async for asset in feed.curator.search(albumIds=[cfg.album_id]):
         if asset.get("isTrashed") or asset.get("type") not in {"IMAGE", "VIDEO"}:
             continue
-        caption = ((asset.get("exifInfo") or {}).get("description") or "").strip()
+        caption = human_caption((asset.get("exifInfo") or {}).get("description"))
         if cfg.require_caption and not caption:
             continue
         if asset["ownerId"] not in feed.writers:

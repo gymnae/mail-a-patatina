@@ -336,6 +336,11 @@ async def feed_page(request: Request, feed_id: str, msg: str = "", error: str = 
     c = core(request)
     await c.people.reload_keys()  # `approve` on the CLI may have added keys since
     feed = c.feeds.get(feed_id)
+    if feed is not None:
+        try:
+            await feed.refresh_members()  # ...and shared the album with them
+        except httpx.HTTPError:
+            log.exception("Reading the members of %s", feed_id)
     members = []
     if feed is not None:
         for m in feed.relatives():
