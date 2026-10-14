@@ -160,6 +160,52 @@ async def check(feed: Feed) -> None:
         print(f"  {c.kind:9} {c.name} → {c.address}")
 
 
+def pending(core: Core) -> None:
+    waiting = False
+    for raw in core.store.all().values():
+        feed = core.feeds.get(raw["id"])
+        bot_missing = raw.get("bot_requested") and not (feed and feed.bot)
+        if not raw.get("pending") and not bot_missing:
+            continue
+        waiting = True
+        print(f"Feed “{raw['id']}” ({raw.get('title')}), owner {raw.get('owner_email')}:")
+        for p in raw.get("pending", []):
+            print(f"  relative  {p['name']} <{p['email']}>  (requested {p['requested_at'][:16]})")
+        if bot_missing:
+            print("  group-chat account (for comments from chat links)")
+    if not waiting:
+        print("Nothing is waiting for approval.")
+
+
+async def approve(core: Core, feed_id: str | None, email: str | None) -> None:
+    """Create the accounts families asked for on the setup page. The admin key is only ever used here."""
+    for raw in list(core.store.all().values()):
+        if feed_id and raw["id"] != feed_id:
+            continue
+        feed = core.feeds[raw["id"]]
+        await feed.sync()
+        for p in list(raw.get("pending", [])):
+            if email and p["email"] != email.lower():
+                continue
+            try:
+                member = await add_account(core, feed, p["name"], p["email"], "viewer", False, wants_email=True)
+            except SystemExit as e:
+                print(f"  ✗ {p['name']} <{p['email']}> for “{feed.id}”: {e}")
+                continue
+            raw["pending"] = [x for x in raw.get("pending", []) if x["email"] != p["email"]]
+            core.store.save(raw)
+            print(f"  ✓ {member.name} <{member.email}> can now get “{feed.id}”")
+        if raw.get("bot_requested") and not feed.bot and not email:
+            try:
+                await add_account(core, feed, feed.cfg.bot_name, feed.cfg.bot_email, "viewer", False, wants_email=False)
+            except SystemExit as e:
+                print(f"  ✗ group-chat account for “{feed.id}”: {e}")
+                continue
+            raw.pop("bot_requested", None)
+            core.store.save(raw)
+            print(f"  ✓ group-chat account for “{feed.id}”")
+
+
 def links(feed: Feed) -> None:
     s = feed.core.settings
     print(f"Feed “{feed.id}”:")
@@ -191,6 +237,11 @@ async def main() -> None:
     test.add_argument("email")
     test.add_argument("-n", type=int, default=3, help="number of moments (default 3)")
     sub.add_parser("whatsapp-groups", help="list WhatsApp groups to find chat ids")
+    sub.add_parser("pending", help="show relatives and group-chat accounts waiting for approval")
+    app = sub.add_parser("approve", help="create the waiting accounts (all, or one feed with --feed, or one EMAIL)")
+    app.add_argument("email", nargs="?")
+    rej = sub.add_parser("reject", help="drop a waiting relative of a feed (needs --feed)")
+    rej.add_argument("email")
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
@@ -207,6 +258,22 @@ async def main() -> None:
             )
             r.raise_for_status()
             print(json.dumps(r.json(), indent=2, ensure_ascii=False))
+            return
+
+        if args.cmd == "pending":
+            pending(core)
+            return
+        if args.cmd == "approve":
+            await approve(core, args.feed, args.email)
+            return
+        if args.cmd == "reject":
+            raw = core.store.get(core.feed(args.feed).id) if args.feed else None
+            if raw is None:
+                raise SystemExit("Name the feed with --feed (only feeds from the setup page have waiting relatives)")
+            before = len(raw.get("pending", []))
+            raw["pending"] = [p for p in raw.get("pending", []) if p["email"] != args.email.lower()]
+            core.store.save(raw)
+            print("Dropped." if len(raw["pending"]) < before else "No such waiting relative.")
             return
 
         # Commands about everyone run on all feeds unless one is named; the others need exactly one feed.

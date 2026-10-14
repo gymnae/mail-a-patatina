@@ -12,11 +12,14 @@ import time
 import httpx
 
 from . import dispatch, mailer, sync
-from .config import FeedConfig, Settings, load_feeds
+from apscheduler.triggers.cron import CronTrigger
+
+from .config import FeedConfig, Settings, feed_config, load_feeds
 from .immich import Immich
 from .library import Library
 from .media import MediaCache
 from .people import Member, People
+from .store import FeedStore
 
 log = logging.getLogger(__name__)
 
@@ -94,7 +97,41 @@ class Core:
         self.people = People(settings)
         self.media = MediaCache(settings.data_dir / "cache")
         self.http = httpx.AsyncClient(timeout=120)
+        self.store = FeedStore(settings.setup_dir)
         self.feeds: dict[str, Feed] = {cfg.id: Feed(self, cfg) for cfg in load_feeds(settings)}
+        self.scheduler = None  # set by the web app; the CLI runs without one
+
+    def schedule(self, feed: Feed) -> None:
+        if self.scheduler is None:
+            return
+        hour, minute = (int(x) for x in feed.cfg.send_time.split(":"))
+        self.scheduler.add_job(feed.sync, "interval", minutes=self.settings.sync_minutes, id=f"sync-{feed.id}",
+                               coalesce=True, max_instances=1, replace_existing=True)
+        self.scheduler.add_job(
+            feed.dispatch, CronTrigger(hour=hour, minute=minute, timezone=feed.cfg.timezone),
+            id=f"dispatch-{feed.id}", coalesce=True, max_instances=1, misfire_grace_time=3600, replace_existing=True,
+        )
+
+    async def apply_stored(self, feed_id: str) -> Feed | None:
+        """(Re)load one family saved by the setup page, or drop it if it was deleted."""
+        old = self.feeds.pop(feed_id, None)
+        if old is not None:
+            if self.scheduler is not None:
+                for job in (f"sync-{feed_id}", f"dispatch-{feed_id}"):
+                    if self.scheduler.get_job(job):
+                        self.scheduler.remove_job(job)
+            await old.aclose()
+        raw = self.store.get(feed_id)
+        if raw is None:
+            return None
+        feed = Feed(self, feed_config(raw, self.settings))
+        self.feeds[feed_id] = feed
+        try:
+            await feed.sync()
+        except Exception:
+            log.exception("First sync of feed %s failed", feed_id)
+        self.schedule(feed)
+        return feed
 
     def feed(self, feed_id: str | None) -> Feed:
         """The named feed, or the only one when there's just one."""

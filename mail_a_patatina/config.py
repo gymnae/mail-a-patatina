@@ -15,7 +15,7 @@ import yaml
 
 CHAT_KINDS = ("whatsapp", "signal", "telegram")
 FEED_ID = re.compile(r"^[a-z0-9][a-z0-9-]{0,31}$")
-RESERVED_IDS = {"static", "healthz"}
+RESERVED_IDS = {"static", "healthz", "setup"}
 
 
 def _list(value) -> list[str]:
@@ -37,6 +37,7 @@ class Settings:
     """Installation-wide settings."""
 
     immich_url: str
+    immich_public_url: str  # where people open Immich in their browser (for links on the setup page)
     admin_api_key: str
     secret_key: str
     link_version: str
@@ -45,6 +46,12 @@ class Settings:
     data_dir: Path
     feeds_file: Path
     keys_file: Path
+    setup_dir: Path
+    oidc_issuer: str
+    oidc_client_id: str
+    oidc_client_secret: str
+    oidc_name: str
+    install_admin_emails: list[str]
     sync_minutes: int
     settle_minutes: int
     resend_hours: int
@@ -60,6 +67,7 @@ class Settings:
     signal_url: str
     signal_number: str
     telegram_token: str
+    whatsapp_number: str  # shown on the setup page: "add this number to your group"
 
     @property
     def secure_cookies(self) -> bool:
@@ -72,6 +80,7 @@ class Settings:
         security = env("SMTP_SECURITY", "starttls").lower()
         settings = cls(
             immich_url=_required("IMMICH_URL").rstrip("/"),
+            immich_public_url=env("IMMICH_PUBLIC_URL", env("IMMICH_URL", "")).rstrip("/"),
             admin_api_key=env("IMMICH_ADMIN_API_KEY", ""),
             secret_key=_required("SECRET_KEY"),
             link_version=env("LINK_VERSION", "1"),
@@ -80,6 +89,12 @@ class Settings:
             data_dir=Path(env("DATA_DIR", "/data")),
             feeds_file=_feeds_file(),
             keys_file=Path(env("KEYS_FILE", "/secrets/relatives.yml")),
+            setup_dir=Path(env("SETUP_DIR", "/secrets/feeds")),
+            oidc_issuer=env("OIDC_ISSUER", "").rstrip("/"),
+            oidc_client_id=env("OIDC_CLIENT_ID", ""),
+            oidc_client_secret=env("OIDC_CLIENT_SECRET", ""),
+            oidc_name=env("OIDC_NAME", "Pocket ID"),
+            install_admin_emails=_list(env("INSTALL_ADMIN_EMAILS")),
             sync_minutes=int(env("SYNC_MINUTES", "15")),
             settle_minutes=int(env("SETTLE_MINUTES", "30")),
             resend_hours=int(env("RESEND_HOURS", "48")),
@@ -95,11 +110,14 @@ class Settings:
             signal_url=env("SIGNAL_URL", "").rstrip("/"),
             signal_number=env("SIGNAL_NUMBER", ""),
             telegram_token=env("TELEGRAM_BOT_TOKEN", ""),
+            whatsapp_number=env("WHATSAPP_NUMBER", ""),
         )
         if len(settings.secret_key) < 32:
             raise SystemExit("SECRET_KEY must be at least 32 characters (e.g. `openssl rand -base64 48`)")
         if security not in {"starttls", "ssl", "none"}:
             raise SystemExit("SMTP_SECURITY must be 'starttls', 'ssl' or 'none'")
+        if bool(settings.oidc_issuer) != bool(settings.oidc_client_id):
+            raise SystemExit("Set both OIDC_ISSUER and OIDC_CLIENT_ID (or neither)")
         return settings
 
 
@@ -191,7 +209,7 @@ def _chats(items) -> list[ChatSpec]:
     return chats
 
 
-def _feed(raw: dict, settings: Settings) -> FeedConfig:
+def feed_config(raw: dict, settings: Settings) -> FeedConfig:
     env = os.environ.get
     feed_id = str(raw.get("id") or "").strip().lower()
     if not FEED_ID.match(feed_id) or feed_id in RESERVED_IDS:
@@ -222,14 +240,17 @@ def _feed(raw: dict, settings: Settings) -> FeedConfig:
 
 
 def load_feeds(settings: Settings) -> list[FeedConfig]:
+    """Families from feeds.yml (or the single family in .env) plus those created on the setup page."""
+    from .store import FeedStore  # avoid an import cycle
+
     if settings.feeds_file.exists():
         data = yaml.safe_load(settings.feeds_file.read_text(encoding="utf-8")) or {}
-        feeds = [_feed(raw, settings) for raw in data.get("feeds") or []]
+        feeds = [feed_config(raw, settings) for raw in data.get("feeds") or []]
     elif os.environ.get("ALBUM_ID"):
         # Single-family setup straight from .env (plus the optional chats file).
         chats_file = Path(os.environ.get("CHATS_FILE", "/config/chats.yml"))
         chats = (yaml.safe_load(chats_file.read_text(encoding="utf-8")) or {}).get("chats") if chats_file.exists() else []
-        feeds = [_feed({
+        feeds = [feed_config({
             "id": os.environ.get("FEED_ID", "family"),
             "album_id": os.environ["ALBUM_ID"],
             "api_key": os.environ.get("IMMICH_API_KEY"),
@@ -238,12 +259,14 @@ def load_feeds(settings: Settings) -> list[FeedConfig]:
             "chats": chats,
         }, settings)]
     else:
-        raise SystemExit(f"No feeds: create {settings.feeds_file} or set ALBUM_ID and IMMICH_API_KEY")
-    if not feeds:
-        raise SystemExit(f"{settings.feeds_file} lists no feeds")
-    ids = [f.id for f in feeds]
-    if len(set(ids)) != len(ids):
+        feeds = []
+    static_ids = {f.id for f in feeds}
+    if len(static_ids) != len(feeds):
         raise SystemExit("Feed ids must be unique")
+    for feed_id, raw in FeedStore(settings.setup_dir).all().items():
+        if feed_id in static_ids:
+            raise SystemExit(f"Feed id {feed_id!r} is in feeds.yml and also set up on the setup page")
+        feeds.append(feed_config(raw, settings))
     bots = [f.bot_email for f in feeds]
     if len(set(bots)) != len(bots):
         raise SystemExit("Each feed needs its own bot_email")

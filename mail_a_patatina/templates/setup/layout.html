@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}{% block page_title %}Set up{% endblock %} · mail-a-patatina{% endblock %}
+{% block nav %}{% if session %}
+<nav class="setup-nav">
+  <a href="/setup/">Your feeds</a>
+  <form method="post" action="/setup/logout" class="inline"><input type="hidden" name="csrf" value="{{ session.csrf }}"><button class="link">Sign out</button></form>
+</nav>
+{% endif %}{% endblock %}
+{% block main %}
+<div class="setup">
+  {% if error %}<p class="notice error" role="alert">{{ error }}</p>{% endif %}
+  {% if msg %}<p class="notice" role="status">{{ msg }}</p>{% endif %}
+  {% block content %}{% endblock %}
+</div>
+{% endblock %}

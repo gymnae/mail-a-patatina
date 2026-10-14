@@ -17,7 +17,6 @@ from urllib.parse import quote, unquote, urlencode
 
 import httpx
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from apscheduler.triggers.cron import CronTrigger
 from fastapi import BackgroundTasks, FastAPI, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
@@ -30,6 +29,7 @@ from .immich import LoginFailed
 from .library import Entry
 from .links import LIKE, nice_date, read_token
 from .people import Member
+from .setup import router as setup_router
 
 log = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -48,32 +48,30 @@ async def lifespan(app: FastAPI):
     global core
     s = Settings.from_env()
     core = Core(s)
+    app.state.core = core
     if s.admin_api_key:
         log.warning("IMMICH_ADMIN_API_KEY is set, but only the setup commands need it. Remove it from .env and "
                     "pass it just for those commands: docker compose run --rm -e IMMICH_ADMIN_API_KEY=… app python -m …")
     try:
-        log.info("Connected to Immich %s, serving feeds: %s",
-                 await next(iter(core.feeds.values())).curator.server_version(), ", ".join(core.feeds))
+        async with httpx.AsyncClient(timeout=30) as http:
+            v = (await http.get(f"{s.immich_url}/api/server/version")).json()
+        log.info("Connected to Immich %s.%s.%s, serving feeds: %s", v["major"], v["minor"], v["patch"],
+                 ", ".join(core.feeds) or "none yet (set them up at /setup/)")
     except Exception:
         log.exception("Immich not reachable yet")
     await core.sync_all()
-    scheduler = AsyncIOScheduler()
+    core.scheduler = AsyncIOScheduler()
     for feed in core.feeds.values():
-        hour, minute = (int(x) for x in feed.cfg.send_time.split(":"))
-        scheduler.add_job(feed.sync, "interval", minutes=s.sync_minutes, id=f"sync-{feed.id}", coalesce=True,
-                          max_instances=1)
-        scheduler.add_job(
-            feed.dispatch, CronTrigger(hour=hour, minute=minute, timezone=feed.cfg.timezone), id=f"dispatch-{feed.id}",
-            coalesce=True, max_instances=1, misfire_grace_time=3600,
-        )
-    scheduler.start()
+        core.schedule(feed)
+    core.scheduler.start()
     yield
-    scheduler.shutdown(wait=False)
+    core.scheduler.shutdown(wait=False)
     await core.aclose()
 
 
 app = FastAPI(lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None)
 app.mount("/static", StaticFiles(directory=HERE / "static"), name="static")
+app.include_router(setup_router)  # before the /{feed_id} routes, so /setup is never taken for a feed
 templates = Jinja2Templates(directory=HERE / "templates")
 templates.env.filters["nice_date"] = nice_date
 

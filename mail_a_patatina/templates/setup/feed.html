@@ -1,0 +1,98 @@
+{% extends "setup/layout.html" %}
+{% block page_title %}{{ raw.title }}{% endblock %}
+{% block content %}
+<h1>{{ raw.title }}</h1>
+<p class="hint">{{ moments }} moment(s) shared · sends every day at {{ raw.send_time }} ({{ raw.timezone }}) ·
+  <a href="{{ link }}" target="_blank" rel="noopener">{{ link }}</a></p>
+
+<section class="panel">
+  <h2>People</h2>
+  <p class="hint">Everyone the Immich album is shared with gets the daily email and can like and comment under their own name.</p>
+  <ul class="people">
+    {% for m in members %}
+    <li><b>{{ m.name }}</b> <span class="hint">{{ m.email }}</span>
+      {% if m.ready %}<span class="tag ok">ready</span>{% else %}<span class="tag">own Immich account, no email</span>{% endif %}</li>
+    {% endfor %}
+    {% for p in raw.pending or [] %}
+    <li><b>{{ p.name }}</b> <span class="hint">{{ p.email }}</span> <span class="tag wait">waiting for approval</span>
+      <form method="post" action="/setup/f/{{ raw.id }}/relatives/cancel" class="inline">
+        <input type="hidden" name="csrf" value="{{ session.csrf }}"><input type="hidden" name="email" value="{{ p.email }}">
+        <button class="link">withdraw</button></form></li>
+    {% endfor %}
+    {% if not members and not raw.pending %}<li class="hint">Nobody yet.</li>{% endif %}
+  </ul>
+  <form method="post" action="/setup/f/{{ raw.id }}/relatives/add" class="row">
+    <input type="hidden" name="csrf" value="{{ session.csrf }}">
+    <label>Name<input name="name" required maxlength="60" placeholder="Oma Erika"></label>
+    <label>Email<input name="email" type="email" required placeholder="oma@example.com"></label>
+    <button>Add</button>
+  </form>
+  <p class="hint">New people get a small Immich account just for liking and commenting. The admin of this installation approves it; you'll see them as “ready” afterwards.</p>
+</section>
+
+<section class="panel">
+  <h2>Family chats</h2>
+  {% if not channels %}
+  <p class="hint">No messenger is set up on this installation.</p>
+  {% else %}
+  <ul class="people">
+    {% for c in raw.chats or [] %}
+    <li><b>{{ c.name }}</b> <span class="hint">{{ c.channel }}</span>
+      <form method="post" action="/setup/f/{{ raw.id }}/chats/remove" class="inline">
+        <input type="hidden" name="csrf" value="{{ session.csrf }}"><input type="hidden" name="chat_id" value="{{ c.chat_id }}">
+        <button class="link">disconnect</button></form></li>
+    {% else %}
+    <li class="hint">No chat connected.</li>
+    {% endfor %}
+  </ul>
+  {% if raw.chats and not bot_ready %}<p class="hint">Comments from chat links wait for the admin to approve the group account; until then, chat visitors can look but not comment.</p>{% endif %}
+  <form method="post" action="/setup/f/{{ raw.id }}/chats/add" class="stack">
+    <input type="hidden" name="csrf" value="{{ session.csrf }}">
+    <label>Messenger<select name="channel">{% for k in channels %}<option value="{{ k }}">{{ {"whatsapp": "WhatsApp", "signal": "Signal", "telegram": "Telegram"}[k] }}</option>{% endfor %}</select></label>
+    <ol class="guide">
+      <li>Add the family number{% if s.whatsapp_number %} <b>{{ s.whatsapp_number }}</b> (WhatsApp){% endif %}{% if s.signal_number %} / <b>{{ s.signal_number }}</b> (Signal){% endif %} to your group. For Telegram, add the bot instead.</li>
+      <li>WhatsApp and Signal: type the group's exact name. Telegram: enter the group's chat id.</li>
+    </ol>
+    <div class="row">
+      <label>Group name<input name="group_name" maxlength="80" placeholder="Familie Falk"></label>
+      <label>or Telegram chat id<input name="chat_id" maxlength="24" placeholder="-1001234567890"></label>
+    </div>
+    <button>Connect group</button>
+  </form>
+  {% endif %}
+</section>
+
+<section class="panel">
+  <h2>Sending rules</h2>
+  <form method="post" action="/setup/f/{{ raw.id }}/settings" class="stack">
+    <input type="hidden" name="csrf" value="{{ session.csrf }}">
+    <label>Title<input name="title" value="{{ raw.title }}" required maxlength="80"></label>
+    {% include "setup/_rules.html" %}
+    <button class="primary">Save</button>
+  </form>
+  <form method="post" action="/setup/f/{{ raw.id }}/test" class="stack">
+    <input type="hidden" name="csrf" value="{{ session.csrf }}">
+    <button class="secondary">Send me a test email</button>
+  </form>
+</section>
+
+<section class="panel">
+  <h2>Immich key</h2>
+  <p class="hint">Replace it if you revoked or rotated it in Immich. Same rules as when you set up the feed.</p>
+  <form method="post" action="/setup/f/{{ raw.id }}/key" class="row">
+    <input type="hidden" name="csrf" value="{{ session.csrf }}">
+    <label>New API key<input name="api_key" type="password" required autocomplete="off"></label>
+    <button>Replace</button>
+  </form>
+</section>
+
+<section class="panel danger">
+  <h2>Delete this feed</h2>
+  <p class="hint">Stops all emails and chat posts. Your album, photos, likes and comments stay in Immich.</p>
+  <form method="post" action="/setup/f/{{ raw.id }}/delete" class="row">
+    <input type="hidden" name="csrf" value="{{ session.csrf }}">
+    <label><span>Type <code>{{ raw.id }}</code> to confirm</span><input name="confirm" required></label>
+    <button class="danger">Delete</button>
+  </form>
+</section>
+{% endblock %}

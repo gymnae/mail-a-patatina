@@ -13,9 +13,9 @@
 <body>
   <header class="top">
     <a class="brand" href="{{ base }}/"><img src="/static/favicon.svg" alt="" width="36" height="36">{{ site_title }}</a>
-    {% if viewer %}
+    {% block nav %}{% if viewer %}
     <nav><a href="{{ base }}/">Feed</a><a href="{{ base }}/calendar">Calendar</a></nav>
-    {% endif %}
+    {% endif %}{% endblock %}
   </header>
   <main>{% block main %}{% endblock %}</main>
 </body>

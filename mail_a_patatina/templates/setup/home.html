@@ -1,0 +1,16 @@
+{% extends "setup/layout.html" %}
+{% block page_title %}Your feeds{% endblock %}
+{% block content %}
+<h1>Hello {{ session.name }}</h1>
+{% for f in feeds %}
+<a class="card setup-card" href="/setup/f/{{ f.id }}">
+  <div class="card-body">
+    <p class="caption">{{ f.title }}</p>
+    <p class="date">Every day at {{ f.send_time }} ({{ f.timezone }}) · {{ f.chats | length }} chat(s){% if f.pending %} · {{ f.pending | length }} waiting for approval{% endif %}</p>
+  </div>
+</a>
+{% else %}
+<p>You haven't set up a family feed yet.</p>
+{% endfor %}
+<p><a class="button primary" href="/setup/new">+ New family feed</a></p>
+{% endblock %}

@@ -21,6 +21,10 @@ RELATIVE_PERMISSIONS = [
     "activity.create", "activity.read", "activity.delete", "user.read", "userPreference.read", "userPreference.update",
 ]
 KEY_NAME = "mail-a-patatina"
+# What the album owner's key needs (entered on the setup page). Nothing that deletes.
+OWNER_PERMISSIONS = [
+    "album.read", "asset.read", "asset.view", "asset.update", "activity.read", "user.read", "albumUser.create",
+]
 
 
 class Immich:
@@ -82,6 +86,9 @@ class Immich:
         await self.http.post("/auth/logout")
 
     # --- albums and assets ---
+
+    async def albums(self) -> list[dict]:
+        return await self._call("GET", "/albums")
 
     async def album(self, album_id: str) -> dict:
         return await self._call("GET", f"/albums/{album_id}")
@@ -163,6 +170,10 @@ class Immich:
 
     async def create_api_key(self, name: str, permissions: list[str]) -> str:
         return (await self._call("POST", "/api-keys", json={"name": name, "permissions": permissions}))["secret"]
+
+    async def api_key_info(self) -> dict:
+        """The key this connection uses: its name and permissions."""
+        return await self._call("GET", "/api-keys/me")
 
     async def delete_api_key(self, key_id: str) -> None:
         await self._call("DELETE", f"/api-keys/{key_id}")

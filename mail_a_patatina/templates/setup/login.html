@@ -1,0 +1,19 @@
+{% extends "setup/layout.html" %}
+{% block page_title %}Sign in{% endblock %}
+{% block content %}
+<div class="hero">
+  <img src="/static/favicon.svg" alt="" width="96" height="96">
+  <h1>Share your family moments</h1>
+  <p>Pick an Immich album, and every morning your relatives get its newest captioned photos by email or in your family chat.</p>
+</div>
+{% if oidc %}
+<p class="center"><a class="button primary" href="/setup/login">Sign in with {{ s.oidc_name }}</a></p>
+<p class="hint center">Use the same account you use for Immich.</p>
+{% else %}
+<form method="post" action="/setup/login/key" class="stack">
+  <label>Your Immich API key<input name="api_key" type="password" required autocomplete="off"></label>
+  <button class="primary">Sign in</button>
+  <p class="hint">Any key from <a href="{{ s.immich_public_url }}/user-settings?isOpen=api-keys" target="_blank" rel="noopener">your Immich account</a> with the permission <code>user.read</code>.</p>
+</form>
+{% endif %}
+{% endblock %}

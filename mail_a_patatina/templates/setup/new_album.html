@@ -1,0 +1,22 @@
+{% extends "setup/layout.html" %}
+{% block page_title %}New feed: album{% endblock %}
+{% block content %}
+<p class="steps">1. Connect Immich ✓ · <b>2. Album &amp; rules</b> · 3. People &amp; chats</p>
+<h1>Which album, and when?</h1>
+{% if not albums %}
+<p>You don't own any album that isn't shared through mail-a-patatina already. Create one in Immich, then <a href="/setup/new/album">reload</a>.</p>
+{% else %}
+<form method="post" action="/setup/new" class="stack">
+  <input type="hidden" name="csrf" value="{{ session.csrf }}">
+  <fieldset class="albums"><legend>Album</legend>
+    {% for a in albums %}
+    <label class="choice"><input type="radio" name="album_id" value="{{ a.id }}" required {% if loop.first %}checked{% endif %}>
+      <span><b>{{ a.albumName }}</b> <span class="hint">{{ a.assetCount }} item(s){% if a.isActivityEnabled is false %} · comments are off for this album{% endif %}</span></span></label>
+    {% endfor %}
+  </fieldset>
+  <label>Title in emails and on the page<input name="title" required maxlength="80" placeholder="e.g. Die Falks"></label>
+  {% include "setup/_rules.html" %}
+  <button class="primary">Create the feed</button>
+</form>
+{% endif %}
+{% endblock %}

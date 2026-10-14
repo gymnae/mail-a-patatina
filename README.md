@@ -58,9 +58,46 @@ mail-a-patatina only **transports, presents and collects**. It has no database: 
 - When mail-a-patatina first starts on an album, photos already there count as backlog: they show on the website but aren't sent (`SEND_BACKLOG=true` sends them).
 - `SEND_MODE=drip` sends one photo per day from the queue instead of a digest.
 
+## Self-service setup
+
+Everyone who can sign in to Immich can set up their own family feed at `PUBLIC_URL/setup/`, with no help from the admin:
+
+1. **Sign in** with your identity provider (e.g. Pocket ID), the same account as for Immich.
+2. **Connect Immich:** the page links to Immich's API-key screen and lists the seven permissions to tick. The pasted key is checked:
+   - it must belong to the same email address,
+   - it must have exactly what the feed needs,
+   - it must not be able to delete anything or administer Immich.
+3. **Album and rules:** pick one of your own albums, a title, the sending time and timezone, digest or one-a-day, whether only captioned photos go out, and whether you want an email when someone comments.
+4. **People and chats:**
+   - Add relatives by name and email.
+   - Connect a WhatsApp or Signal group by adding the installation's number to it and typing the group's exact name. The page never lists the number's groups, because those include other families' groups. Telegram groups are connected by chat id.
+5. **Test email**, changing the rules, replacing the key, or deleting the feed, whenever you like.
+
+**Relatives wait for the admin.** Creating an Immich account needs admin rights, and the running service doesn't hold any:
+- **The admin is told:** a family's request shows up as "waiting for approval", and `INSTALL_ADMIN_EMAILS` gets an email.
+- **One command approves:** the admin runs `approve`, which creates the accounts as before, with the `patatina-` prefix, no upload quota and their own narrow key.
+- **Then they're live:** the relative appears as "ready" on the setup page and is in the next morning's email. The same goes for the group-chat account a feed needs once a chat is connected.
+
+```sh
+docker compose run --rm -e IMMICH_ADMIN_API_KEY app python -m mail_a_patatina pending
+docker compose run --rm -e IMMICH_ADMIN_API_KEY app python -m mail_a_patatina approve            # everything waiting
+docker compose run --rm -e IMMICH_ADMIN_API_KEY app python -m mail_a_patatina --feed die-falks reject oma@example.com
+```
+
+**Where the settings live:** each family's settings are saved as one file in `SETUP_DIR` (`./secrets/feeds/`, mode 600; it contains that family's key). Everything else stays in Immich, as before. People can only see and change the feeds they created themselves.
+
+### Pocket ID (or any OIDC provider)
+
+In Pocket ID, add an OIDC client:
+- **Name:** `mail-a-patatina`
+- **Callback URL:** `https://<your PUBLIC_URL>/setup/callback`
+- **Optional:** under *allowed user groups*, limit it to the group that may use Immich.
+
+Put its client id and secret into `OIDC_CLIENT_ID` and `OIDC_CLIENT_SECRET`, and Pocket ID's URL into `OIDC_ISSUER`. The login uses the authorization-code flow with PKCE and asks for `openid email profile`. The email address it returns is matched against the Immich account of the key a person pastes.
+
 ## Several families on one installation
 
-One mail-a-patatina can serve several Immich users who don't know each other. Each family is a **feed**: one album, its owner's API key, its own title, send time, timezone, chats and bot account, listed in `config/feeds.yml` (see `feeds.example.yml`). With a single family you can skip that file and put `ALBUM_ID` and `IMMICH_API_KEY` in `.env`.
+One mail-a-patatina can serve several Immich users who don't know each other. Families usually set themselves up on the setup page (above); the admin can also define them in a file. Each family is a **feed**: one album, its owner's API key, its own title, send time, timezone, chats and bot account, listed in `config/feeds.yml` (see `feeds.example.yml`). With a single family you can skip that file and put `ALBUM_ID` and `IMMICH_API_KEY` in `.env`.
 
 How families are kept apart:
 - **Separate pages:** each family's pages live under `PUBLIC_URL/<feed id>/`, and the sign-in cookie only applies to that path.
@@ -70,41 +107,42 @@ How families are kept apart:
 
 Because the families' API keys sit in `config/feeds.yml`, whoever runs mail-a-patatina can read those families' libraries. In practice that's the Immich admin, who can see everything on the server anyway.
 
-## Setup
+## Installation (admin)
 
-1. **In Immich:** create the album, turn on *comments & likes* for it, and create API keys:
-   - **Album owner's key** (`IMMICH_API_KEY`): `album.read`, `asset.read`, `asset.view`, `asset.update`, `activity.read`, `user.read`, `albumUser.create`.
-   - **Admin's key** (`IMMICH_ADMIN_API_KEY`): `adminUser.read`, `adminUser.create`, `adminUser.update`. No delete permission is needed. The only delete right any key of this project holds is the relatives' `activity.delete`, for taking back their own like or comment. Only the setup commands use it, so you can remove it afterwards.
-   - **Contributors:** if a co-parent also adds their own photos to the album, they create an API key in *their own* Immich account (*Account settings → API keys*) with exactly `user.read`, `asset.read` and `asset.update`, and you add it to that feed's `contributor_keys` (or `IMMICH_CONTRIBUTOR_KEYS` for a single family). mail-a-patatina only uses it to read and write the delivery marker on that person's photos. Immich only lets an asset's owner write its metadata; without their key, their photos are skipped.
-   - **OAuth-only servers:** password login has to be on while `add-relative` and `add-bot` run, because signing in once is the only way to create a key for an account. Give the admin key `adminConfig.read` and `adminConfig.update` too, and the command switches password login on for those few seconds and off again, even if something fails. Without those permissions, or if your Immich settings come from a config file, it tells you to switch it yourself under *Administration → Settings → Authentication settings*.
-2. **Configure and start:**
+The admin only sets up the installation; families do the rest on the setup page.
+
+1. **Configure and start:**
    ```sh
-   cp .env.example .env                      # Immich, SECRET_KEY, SMTP, PUBLIC_URL (+ ALBUM_ID for one family)
-   mkdir -p config && chmod 700 config
-   cp feeds.example.yml config/feeds.yml     # several families (or: cp chats.example.yml config/chats.yml)
+   cp .env.example .env          # Immich URLs, SECRET_KEY, PUBLIC_URL, SMTP, OIDC client, INSTALL_ADMIN_EMAILS
    docker compose up -d          # pulls the image built by GitHub Actions (MAP_IMAGE), or add --build to build locally
-   ```
-3. **Add the people:**
-   ```sh
-   export IMMICH_ADMIN_API_KEY=…   # only for these commands; keep it out of .env
-   docker compose run --rm -e IMMICH_ADMIN_API_KEY app python -m mail_a_patatina --feed mueller add-relative "Oma Erika" oma@example.com
-   docker compose run --rm -e IMMICH_ADMIN_API_KEY app python -m mail_a_patatina --feed mueller add-bot   # for group-chat visitors
    docker compose exec app python -m mail_a_patatina check
    ```
-   The accounts appear in Immich as `patatina-Oma Erika` (`USER_PREFIX`), so they're easy to tell apart from real users. Pages and emails show just *Oma Erika*. They get a storage quota of 0, so they can't upload anything, and their API key can't either.
-   `add-relative` creates the Immich account, shares the album with it as *viewer*, creates that account's API key in `./secrets/relatives.yml`, and turns off Immich's own album emails for it so nobody gets two. Running it again for the same person replaces the key. If the relative already has an Immich account, `--adopt` takes it over. That resets its password, so don't adopt co-parents or anyone who signs in to Immich themselves. They see everything in Immich anyway and simply get no email. `check` shows who is who.
-4. **Put a reverse proxy in front:** expose only port 8080, with HTTPS (Caddy, Traefik, nginx…), and set `PUBLIC_URL` to that address. Immich itself never has to be reachable from the internet, because images and videos are proxied.
-5. **Email delivery:** make sure the sending domain has SPF, DKIM and DMARC set up, or the morning email lands in spam. Test with `send-test oma@example.com`.
+   Then register the OIDC client (see *Pocket ID* above) and send families the link `PUBLIC_URL/setup/`.
+2. **Admin key for approvals** (`IMMICH_ADMIN_API_KEY`): `adminUser.read`, `adminUser.create`, `adminUser.update`.
+   - **Pass it only to the commands that need it, never in `.env`:** `docker compose run --rm -e IMMICH_ADMIN_API_KEY app python -m mail_a_patatina approve`.
+   - **OAuth-only Immich servers:** add `adminConfig.read` and `adminConfig.update`. Password login has to be on while an account gets its key, and `approve` switches it on for those few seconds and off again, even if something fails. Without those two permissions, or if your Immich settings come from a config file, it tells you to switch it yourself under *Administration → Settings → Authentication settings*.
+   - **No delete permission needed:** the only delete right any key of this project holds is the relatives' `activity.delete`, for taking back their own like or comment.
+   - **What approved accounts look like:** they appear in Immich as `patatina-Oma Erika` (`USER_PREFIX`). Their storage quota is 0, so they can't upload anything, and their API key can't either. Immich's own album emails are switched off for them, so nobody gets two.
+3. **Reverse proxy:** expose only port 8080, with HTTPS (Caddy, Traefik, nginx…), and set `PUBLIC_URL` to that address. Immich itself never has to be reachable from the internet, because images and videos are proxied.
+4. **Email delivery:** make sure the sending domain has SPF, DKIM and DMARC set up, or the morning email lands in spam.
 
-### WhatsApp (GOWA)
+**Co-parents who add their own photos:** Immich only lets a photo's owner write its metadata. So a co-parent creates a key in *their own* account with exactly `user.read`, `asset.read` and `asset.update`, and the admin adds it to that feed's `contributor_keys` in its settings file. Without it, their photos are skipped.
+
+**Families defined by the admin** instead of on the setup page also still work: `config/feeds.yml`, or `ALBUM_ID` in `.env` for a single family, with `add-relative` and `add-bot` on the CLI. `add-relative --adopt` takes over an existing Immich account, which resets its password, so don't adopt anyone who signs in to Immich themselves.
+
+### Messenger gateways (admin)
+
+Families connect their own groups on the setup page. The admin runs the gateways, one number for the whole installation.
+
+#### WhatsApp (GOWA)
 
 1. Set `WHATSAPP_AUTH` in `.env`, then start the gateway with `docker compose --profile whatsapp up -d`.
 2. Open `http://127.0.0.1:3000` on the Docker host. On the phone, go to *WhatsApp → Linked devices* and scan the QR code.
-3. Find the group's id (it ends in `@g.us`) with `python -m mail_a_patatina whatsapp-groups`, and add it to that family's `chats:`.
+3. Set `WHATSAPP_NUMBER` in `.env`, so families see which number to add to their group.
 
 ⚠️ WhatsApp has no official API for posting to groups. GOWA acts like WhatsApp Web on a linked phone, which is against WhatsApp's terms and can get the number banned. Use a spare number, and keep the volume to these few messages a day.
 
-### Signal and Telegram
+#### Signal and Telegram
 
 - **Signal:** run `docker compose --profile signal up -d`, then link via `http://127.0.0.1:8081/v1/qrcodelink?device_name=family-feed`. Set `SIGNAL_NUMBER`. Group ids are at `/v1/groups/<number>`.
 - **Telegram:** create a bot with @BotFather, add it to the group, and set `TELEGRAM_BOT_TOKEN`. Use the group's (negative) chat id.
@@ -137,6 +175,9 @@ The app uses its own copies in `mail_a_patatina/static/`:
 
 ```sh
 docker compose exec app python -m mail_a_patatina check                              # setup status, who gets what
+docker compose run --rm -e IMMICH_ADMIN_API_KEY app python -m mail_a_patatina pending   # what families are waiting for
+docker compose run --rm -e IMMICH_ADMIN_API_KEY app python -m mail_a_patatina approve [EMAIL]
+docker compose run --rm -e IMMICH_ADMIN_API_KEY app python -m mail_a_patatina --feed die-falks reject EMAIL
 docker compose exec app python -m mail_a_patatina links                              # everyone's magic links
 docker compose exec app python -m mail_a_patatina --feed mueller send-test EMAIL -n 3   # doesn't mark anything as sent
 docker compose exec app python -m mail_a_patatina sync | dispatch
