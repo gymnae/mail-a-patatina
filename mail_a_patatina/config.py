@@ -9,6 +9,7 @@ import hashlib
 import os
 import re
 from dataclasses import dataclass, field
+from email.utils import formataddr, parseaddr
 from pathlib import Path
 
 import yaml
@@ -184,6 +185,7 @@ class FeedConfig:
     api_key: str  # the album owner's key
     contributor_keys: list[str]
     require_caption: bool
+    send_tag: str  # the Immich tag that queues a photo for sending (each uploader tags their own photos)
     send_backlog: bool
     timezone: str
     send_time: str
@@ -219,22 +221,25 @@ def feed_config(raw: dict, settings: Settings) -> FeedConfig:
         if not raw.get(key):
             raise SystemExit(f"Feed {feed_id!r} needs {key}")
     send_mode = str(raw.get("send_mode") or env("SEND_MODE", "digest")).lower()
+    title = str(raw.get("title") or env("SITE_TITLE", "Family Feed"))
     if send_mode not in {"digest", "drip"}:
         raise SystemExit(f"Feed {feed_id!r}: send_mode must be 'digest' or 'drip'")
     return FeedConfig(
         id=feed_id,
-        title=str(raw.get("title") or env("SITE_TITLE", "Family Feed")),
+        title=title,
         album_id=str(raw["album_id"]).strip(),
         api_key=str(raw["api_key"]).strip(),
         contributor_keys=_list(raw.get("contributor_keys")),
         require_caption=_bool(raw.get("require_caption", env("REQUIRE_CAPTION")), True),
+        send_tag=str(raw.get("send_tag") or env("SEND_TAG") or "Patatina").strip(),
         send_backlog=_bool(raw.get("send_backlog", env("SEND_BACKLOG")), False),
         timezone=str(raw.get("timezone") or env("TZ", "UTC")),
         send_time=str(raw.get("send_time") or env("SEND_TIME", "07:00")),
         send_mode=send_mode,
         bot_email=str(raw.get("bot_email") or f"{feed_id}-chat@mail-a-patatina.invalid").strip().lower(),
         bot_name=str(raw.get("bot_name") or env("BOT_NAME", "Family chat")),
-        smtp_from=str(raw.get("smtp_from") or settings.smtp_from),
+        # The family's title as the sender's name, at the installation's address (SMTP_FROM).
+        smtp_from=str(raw.get("smtp_from") or formataddr((title, parseaddr(settings.smtp_from)[1]))),
         admin_emails=_list(raw.get("admin_emails", env("ADMIN_EMAILS"))),
         whatsapp_device=None if raw.get("whatsapp_device") is None else str(raw["whatsapp_device"]).strip(),
         chats=_chats(raw.get("chats")),

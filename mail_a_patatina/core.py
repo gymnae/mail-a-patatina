@@ -39,6 +39,9 @@ class Feed:
         self.members: dict[str, Member] = {}  # album members by user id, refreshed on every sync
         self.library = Library()
         self.synced_once = False
+        self.tag_problem: str | None = None  # why tagged photos can't be found, shown on the setup page
+        self.refused_keys = 0  # co-parent keys Immich no longer accepts
+        self.unkeyed: set[str] = set()  # users with photos in the album but no key here (co-parents to add)
         self.lock = asyncio.Lock()  # this feed's sync and dispatch never overlap
         self._activities: tuple[float, list[dict]] | None = None
 
@@ -54,8 +57,20 @@ class Feed:
         return [m for m in self.members.values() if m.role != "owner" and m.email != self.cfg.bot_email]
 
     async def identify_keys(self) -> None:
-        for client in [self.curator, *self._contributors]:
-            me = await client.me()
+        me = await self.curator.me()
+        self.curator.user_id = me["id"]
+        self.writers[me["id"]] = self.curator
+        self.refused_keys = 0
+        for client in self._contributors:
+            try:
+                me = await client.me()
+            except httpx.HTTPStatusError as e:
+                if e.response.status_code not in (401, 403):
+                    raise
+                # A revoked co-parent key only costs their photos, not the whole feed.
+                log.warning("Feed %s: Immich refused a co-parent key (revoked?)", self.id)
+                self.refused_keys += 1
+                continue
             client.user_id = me["id"]
             self.writers[me["id"]] = client
 

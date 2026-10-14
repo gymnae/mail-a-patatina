@@ -7,5 +7,5 @@
   <label class="choice"><input type="radio" name="send_mode" value="digest" {% if not raw or raw.send_mode != 'drip' %}checked{% endif %}><span><b>Daily digest</b>: everything new since the day before</span></label>
   <label class="choice"><input type="radio" name="send_mode" value="drip" {% if raw and raw.send_mode == 'drip' %}checked{% endif %}><span><b>One a day</b>: a queue, so a big batch spreads over the following days</span></label>
 </fieldset>
-<label class="choice"><input type="checkbox" name="require_caption" value="1" {% if not raw or raw.require_caption is not false %}checked{% endif %}><span>Only send photos that have a description in Immich (writing it is how you publish a photo)</span></label>
+<label class="choice"><input type="checkbox" name="require_caption" value="1" {% if not raw or raw.require_caption is not false %}checked{% endif %}><span>Only send tagged photos that also have a description in Immich (it becomes the caption)</span></label>
 <label class="choice"><input type="checkbox" name="notify_me" value="1" {% if raw and raw.admin_emails %}checked{% endif %}><span>Email me when someone comments</span></label>

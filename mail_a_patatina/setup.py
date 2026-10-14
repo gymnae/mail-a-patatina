@@ -28,7 +28,7 @@ from fastapi.templating import Jinja2Templates
 
 from . import dispatch, mailer
 from .config import CHAT_KINDS
-from .immich import OWNER_PERMISSIONS, Immich
+from .immich import CONTRIBUTOR_PERMISSIONS, OWNER_PERMISSIONS, Immich
 from .library import now
 from .links import LIKE, make_token, nice_date
 from .whatsapp import Gateway, GatewayError
@@ -216,8 +216,8 @@ async def home(request: Request):
 # --- new feed: 1. the key, 2. the album and rules ------------------------------------
 
 
-async def check_owner_key(request: Request, key: str, email: str) -> tuple[dict | None, str | None]:
-    """-> (Immich user, None) if the key may be used as an album-owner key for `email`, else (None, problem)."""
+async def check_key(request: Request, key: str, needed: list[str]) -> tuple[dict | None, str | None]:
+    """-> (Immich user, None) if the key has every permission in `needed` and nothing dangerous, else (None, problem)."""
     client = Immich(settings(request).immich_url, api_key=key)
     try:
         me = await client.me()
@@ -228,17 +228,23 @@ async def check_owner_key(request: Request, key: str, email: str) -> tuple[dict 
         return None, f"Immich refused this key: {e}"
     finally:
         await client.aclose()
-    if me["email"].lower() != email:
-        return None, f"This key belongs to {me['email']}, but you signed in as {email}."
     too_much = sorted(p for p in perms if p == "all" or p.startswith(("admin", "system", "maintenance", "server"))
                       or p.endswith(".delete"))
     if too_much:
         return None, ("This key can do too much: " + ", ".join(too_much)
                       + ". Create one with only the permissions listed below.")
-    missing = [p for p in OWNER_PERMISSIONS if p not in perms]
+    missing = [p for p in needed if p not in perms]
     if missing:
         return None, "This key is missing: " + ", ".join(missing) + "."
     return me, None
+
+
+async def check_owner_key(request: Request, key: str, email: str) -> tuple[dict | None, str | None]:
+    """-> (Immich user, None) if the key may be used as an album-owner key for `email`, else (None, problem)."""
+    me, problem = await check_key(request, key, OWNER_PERMISSIONS)
+    if me and me["email"].lower() != email:
+        return None, f"This key belongs to {me['email']}, but you signed in as {email}."
+    return me, problem
 
 
 @router.get("/new", response_class=HTMLResponse)
@@ -360,8 +366,14 @@ async def feed_page(request: Request, feed_id: str, msg: str = "", error: str = 
         except (httpx.HTTPError, GatewayError):
             log.exception("WhatsApp gateway for %s", feed_id)
             whatsapp_down = True
+    coparents, skipped = [], []
+    if feed is not None:
+        coparents = [feed.members.get(uid) or uid for uid in contributor_keys(feed)]
+        skipped = [feed.members[uid].name if uid in feed.members else "someone no longer in the album"
+                   for uid in feed.unkeyed]
     return page(
         request, "setup/feed.html", session, raw=raw, feed=feed, members=members, channels=channels,
+        coparents=coparents, skipped=skipped, coparent_permissions=CONTRIBUTOR_PERMISSIONS,
         whatsapp=whatsapp, whatsapp_down=whatsapp_down,
         timezones=TIMEZONES, msg=msg, error=error, link=f"{s.public_url}/{feed_id}/",
         moments=len(feed.library.ordered) if feed else 0, bot_ready=bool(feed and feed.bot),
@@ -401,6 +413,59 @@ async def replace_key(request: Request, feed_id: str, csrf: str = Form(), api_ke
     core(request).store.save(raw)
     await core(request).apply_stored(feed_id)
     return back(feed_id, msg="Key replaced. You can now revoke the old one in Immich.")
+
+
+# --- co-parents: album members who add photos of their own ---------------------------
+
+
+def contributor_keys(feed) -> dict[str, str]:
+    """user id -> key of the co-parents connected to a loaded feed."""
+    return {uid: c.http.headers["x-api-key"] for uid, c in feed.writers.items() if c is not feed.curator}
+
+
+@router.post("/f/{feed_id}/coparents/add")
+async def add_coparent(request: Request, feed_id: str, csrf: str = Form(), api_key: str = Form()):
+    """The owner pastes a key the co-parent created in their own Immich account (only a photo's owner
+    can tag it and record that it was sent)."""
+    session = require(request, csrf)
+    raw = owned(request, session, feed_id)
+    feed = core(request).feeds.get(feed_id)
+    if feed is None or not feed.writers:
+        return back(feed_id, error="The album couldn't be read yet. Try again in a moment.")
+    key = api_key.strip()
+    me, problem = await check_key(request, key, CONTRIBUTOR_PERMISSIONS)
+    if problem:
+        return back(feed_id, error=problem)
+    await feed.refresh_members()
+    member = feed.members.get(me["id"])
+    if member is None:
+        return back(feed_id, error=f"This key belongs to {me['email']}, who isn't in the album. "
+                                   "Share the album with them in Immich (as editor, so they can add photos) first.")
+    if member.role == "owner":
+        return back(feed_id, error="That's your own key. The co-parent creates the key in their Immich account.")
+    keys = contributor_keys(feed)
+    replaced = keys.pop(me["id"], None)
+    raw["contributor_keys"] = [*keys.values(), key]
+    core(request).store.save(raw)
+    await core(request).apply_stored(feed_id)
+    name = core(request).people.display_name(me["name"])
+    return back(feed_id, msg=f"{name}'s key replaced. They can revoke the old one in Immich." if replaced
+                else f"{name} is connected. Their tagged photos are sent too.")
+
+
+@router.post("/f/{feed_id}/coparents/remove")
+async def remove_coparent(request: Request, feed_id: str, csrf: str = Form(), user_id: str = Form()):
+    session = require(request, csrf)
+    raw = owned(request, session, feed_id)
+    feed = core(request).feeds.get(feed_id)
+    keys = contributor_keys(feed) if feed else {}
+    if user_id not in keys:
+        return back(feed_id)
+    del keys[user_id]
+    raw["contributor_keys"] = list(keys.values())
+    core(request).store.save(raw)
+    await core(request).apply_stored(feed_id)
+    return back(feed_id, msg="Disconnected. Their photos aren't sent anymore; they can revoke the key in Immich.")
 
 
 async def find_signal_group(request: Request, name: str) -> tuple[str | None, str | None]:

@@ -2,7 +2,7 @@
 
 <h1 align="center">mail-a-patatina</h1>
 
-A self-hosted, ad-free take on Tinybeans for [Immich](https://immich.app). Each morning, relatives get an email with the newest captioned photos from a shared Immich album. They tap ❤️ or comment without passwords, and every like and comment lands in Immich under their own name. The same moments can also go to WhatsApp, Signal or Telegram chats.
+A self-hosted, ad-free take on Tinybeans for [Immich](https://immich.app). Each morning, relatives get an email with the photos you tagged for sending in a shared Immich album. They tap ❤️ or comment without passwords, and every like and comment lands in Immich under their own name. The same moments can also go to WhatsApp, Signal or Telegram chats.
 
 mail-a-patatina only **transports, presents and collects**. It has no database: everything it knows comes from, or is written back to, Immich.
 
@@ -10,7 +10,7 @@ mail-a-patatina only **transports, presents and collects**. It has no database: 
              Immich = the single source of truth                 mail-a-patatina (stateless)
  ┌────────────────────────────────────────────────────────┐     ┌──────────────────────────────┐
  │ album "Family Feed"                                    │     │ daily email (your SMTP)      │
- │   photos + description (= caption)       ──────────────┼────►│ WhatsApp / Signal / Telegram │
+ │   photos tagged "Patatina" + description ──────────────┼────►│ WhatsApp / Signal / Telegram │
  │   shared with Oma, Uncle Tom… (= recipients)           │     │ feed · calendar · photo page │
  │   ❤️ likes and comments, per person      ◄─────────────┼─────│ (magic links, no passwords)  │
  │   asset metadata "mail-a-patatina" (= what was sent)   │     └──────────────────────────────┘
@@ -21,7 +21,7 @@ mail-a-patatina only **transports, presents and collects**. It has no database: 
 | What | Where it lives |
 |---|---|
 | Photos, captions, dates | Immich assets and their description |
-| What's shared | One album (photos with a description, if `REQUIRE_CAPTION=true`) |
+| What's shared | Photos in one album that their owner tagged `SEND_TAG` (default `Patatina`), and that have a description if `REQUIRE_CAPTION=true` |
 | Who gets email | The people the album is shared with (not the owner, not the bot) |
 | Likes and comments | Immich album activity, posted as each relative's own Immich account |
 | What was already sent, and to whom | Immich asset metadata, key `mail-a-patatina` |
@@ -33,7 +33,9 @@ mail-a-patatina only **transports, presents and collects**. It has no database: 
 
 ## How it works
 
-**Sharing a moment.** Add a photo to the album and write its description in Immich. Writing the caption is what publishes it; uncaptioned photos are never sent. At `SEND_TIME` (default 07:00), everything new goes out. Until then, or for at least `SETTLE_MINUTES`, you can still fix the caption. To pull something back, remove it from the album or clear its caption.
+**Sharing a moment.** Add a photo to the album, write its description in Immich, and tag it `Patatina` (`SEND_TAG`). Tagging is the explicit "send this" step: bulk edits or bulk captions never queue anything, and each photo is sent only once, whatever is edited later. At `SEND_TIME` (default 07:00), everything newly tagged goes out. Until then, or for at least `SETTLE_MINUTES`, you can still fix the caption. To pull something back, remove the tag or remove it from the album. That also takes it off the website.
+
+Tags belong to one user in Immich, and only a photo's owner can tag it. A co-parent tags their own photos with their own tag of the same name. Nested tags like `Family/Patatina` match too.
 
 **Relatives are Immich users.** Each relative gets a viewer-only Immich account that the album is shared with. When it's set up, `add-relative` creates an API key *for that account* that can only like, comment, take back its own like or comment, and read or change its email setting. It saves the key in `./secrets/relatives.yml`. mail-a-patatina uses that key to like and comment as the person, so their ❤️ and comments show up natively in your Immich app, and your replies in Immich appear on their page too. Relatives never need to know their account exists. This works on OAuth-only servers too: `add-relative` switches password login on for the few seconds it needs, because signing in once is the only way Immich lets anyone create a key for a user.
 
@@ -63,13 +65,14 @@ mail-a-patatina only **transports, presents and collects**. It has no database: 
 Everyone who can sign in to Immich can set up their own family feed at `PUBLIC_URL/setup/`, with no help from the admin:
 
 1. **Sign in** with your identity provider (e.g. Pocket ID), the same account as for Immich.
-2. **Connect Immich:** the page links to Immich's API-key screen and lists the seven permissions to tick. The pasted key is checked:
+2. **Connect Immich:** the page links to Immich's API-key screen and lists the eight permissions to tick. The pasted key is checked:
    - it must belong to the same email address,
    - it must have exactly what the feed needs,
    - it must not be able to delete anything or administer Immich.
-3. **Album and rules:** pick one of your own albums, a title, the sending time and timezone, digest or one-a-day, whether only captioned photos go out, and whether you want an email when someone comments.
+3. **Album and rules:** pick one of your own albums, a title, the sending time and timezone, digest or one-a-day, whether tagged photos also need a caption, and whether you want an email when someone comments.
 4. **People and chats:**
    - Add relatives by name and email.
+   - Add co-parents by pasting a key they created in their own Immich account.
    - **WhatsApp:** link a WhatsApp account of the family's own, by scanning a QR code or typing a pairing code on the phone, like WhatsApp Web. Moments are posted from that account, and its groups are offered to pick from. Use a spare number rather than a personal one, because the server holds the session.
    - **Signal:** add the installation's number to the group and type the group's exact name. The page never lists the number's groups, because those include other families' groups.
    - **Telegram:** add the installation's bot and enter the group's chat id.
@@ -128,7 +131,7 @@ The admin only sets up the installation; families do the rest on the setup page.
 3. **Reverse proxy:** expose only port 8080, with HTTPS (Caddy, Traefik, nginx…), and set `PUBLIC_URL` to that address. Immich itself never has to be reachable from the internet, because images and videos are proxied.
 4. **Email delivery:** make sure the sending domain has SPF, DKIM and DMARC set up, or the morning email lands in spam.
 
-**Co-parents who add their own photos:** Immich only lets a photo's owner write its metadata. So a co-parent creates a key in *their own* account with exactly `user.read`, `asset.read` and `asset.update`, and the admin adds it to that feed's `contributor_keys` in its settings file. Without it, their photos are skipped.
+**Co-parents who add their own photos:** Immich only lets a photo's owner tag it and write its metadata. So the co-parent creates a key in *their own* account with exactly `user.read`, `asset.read`, `asset.update` and `tag.read` and gives it to the parent who set up the feed. That parent pastes it under *Co-parents* on the setup page; the co-parent never signs in there. The key must belong to someone the album is shared with. Until a key is added, their photos are skipped, and the setup page says whose. For families in `feeds.yml`, the admin lists the keys under `contributor_keys`.
 
 **Families defined by the admin** instead of on the setup page also still work: `config/feeds.yml`, or `ALBUM_ID` in `.env` for a single family, with `add-relative` and `add-bot` on the CLI. `add-relative --adopt` takes over an existing Immich account, which resets its password, so don't adopt anyone who signs in to Immich themselves.
 

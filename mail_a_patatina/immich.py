@@ -23,8 +23,11 @@ RELATIVE_PERMISSIONS = [
 KEY_NAME = "mail-a-patatina"
 # What the album owner's key needs (entered on the setup page). Nothing that deletes.
 OWNER_PERMISSIONS = [
-    "album.read", "asset.read", "asset.view", "asset.update", "activity.read", "user.read", "albumUser.create",
+    "album.read", "asset.read", "asset.view", "asset.update", "activity.read", "tag.read", "user.read",
+    "albumUser.create",
 ]
+# What a co-parent's key needs: find their own photos tagged for sending, and record deliveries on them.
+CONTRIBUTOR_PERMISSIONS = ["user.read", "asset.read", "asset.update", "tag.read"]
 
 
 class Immich:
@@ -95,6 +98,10 @@ class Immich:
 
     async def add_album_user(self, album_id: str, user_id: str, role: str = "viewer") -> None:
         await self._call("PUT", f"/albums/{album_id}/users", json={"albumUsers": [{"userId": user_id, "role": role}]})
+
+    async def tags(self) -> list[dict]:
+        """This user's tags (tags are per user in Immich)."""
+        return await self._call("GET", "/tags")
 
     async def search(self, **filters) -> AsyncIterator[dict]:
         """Yield every asset matching the filters, following Immich's pagination."""

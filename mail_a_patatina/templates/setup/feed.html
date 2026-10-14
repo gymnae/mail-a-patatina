@@ -6,6 +6,54 @@
   <a href="{{ link }}" target="_blank" rel="noopener">{{ link }}</a></p>
 
 <section class="panel">
+  <h2>Sending a photo</h2>
+  {% if feed and feed.tag_problem %}<p class="notice error" role="alert">Tagged photos can't be found: {{ feed.tag_problem }}.
+    Create a new key with the permissions below and replace it under “Immich key”.</p>{% endif %}
+  <ol class="guide">
+    <li>Add the photo to the album <b>and</b> tag it <code>{{ feed.cfg.send_tag if feed else "Patatina" }}</code> in Immich
+      (select it → <b>Tag</b>; the first time, type the name to create the tag).</li>
+    {% if raw.require_caption is not false %}<li>Write its description; that's the caption relatives see.</li>{% endif %}
+    <li>It goes out at the next sending time, at the earliest {{ s.settle_minutes }} minutes after tagging.
+      Remove the tag before then to take it back. Each photo is only ever sent once.</li>
+  </ol>
+</section>
+
+<section class="panel">
+  <h2>Co-parents</h2>
+  <p class="hint">Someone else who adds photos to the album, like the other parent. Immich only lets a photo's owner tag it,
+    so their photos are sent once you add a key from <i>their</i> account here, and they tag them themselves.</p>
+  {% if skipped %}<p class="notice error" role="alert">Photos by {{ skipped | join(", ") }} are skipped: add their key below.</p>{% endif %}
+  {% if feed and feed.refused_keys %}<p class="notice error" role="alert">Immich refused {{ feed.refused_keys }} co-parent key(s), probably revoked.
+    Add a new key for that person below.</p>{% endif %}
+  <ul class="people">
+    {% for c in coparents %}
+    <li>{% if c.name is defined %}<b>{{ c.name }}</b> <span class="hint">{{ c.email }}</span>{% set uid = c.id %}
+      {% else %}<b>Not in the album anymore</b>{% set uid = c %}{% endif %} <span class="tag ok">connected</span>
+      <form method="post" action="/setup/f/{{ raw.id }}/coparents/remove" class="inline">
+        <input type="hidden" name="csrf" value="{{ session.csrf }}"><input type="hidden" name="user_id" value="{{ uid }}">
+        <button class="link">disconnect</button></form></li>
+    {% else %}
+    <li class="hint">None.</li>
+    {% endfor %}
+  </ul>
+  <details>
+    <summary>Add a co-parent</summary>
+    <ol class="guide">
+      <li>Share the album with them in Immich as <b>editor</b>, so they can add photos.</li>
+      <li>Ask them to open <a href="{{ s.immich_public_url }}/user-settings?isOpen=api-keys" target="_blank" rel="noopener">Immich → Account settings → API keys</a>
+        in <b>their</b> account, create a key named <code>mail-a-patatina</code> with exactly these permissions, and send it to you:
+        <ul class="perms">{% for p in coparent_permissions %}<li><code>{{ p }}</code></li>{% endfor %}</ul></li>
+      <li>Paste it here. Adding a new key for someone who is already connected replaces their old one.</li>
+    </ol>
+    <form method="post" action="/setup/f/{{ raw.id }}/coparents/add" class="row">
+      <input type="hidden" name="csrf" value="{{ session.csrf }}">
+      <label>Their API key<input name="api_key" type="password" required autocomplete="off" spellcheck="false"></label>
+      <button>Add</button>
+    </form>
+  </details>
+</section>
+
+<section class="panel">
   <h2>People</h2>
   <p class="hint">Everyone the Immich album is shared with gets the daily email and can like and comment under their own name.</p>
   <ul class="people">
