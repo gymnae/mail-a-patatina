@@ -189,7 +189,7 @@ def render(request: Request, template: str, viewer: Viewer | None, status: int =
     feed = viewer.feed if viewer else ctx.pop("feed", None)
     ctx |= {
         "viewer": viewer, "like": LIKE,
-        "site_title": feed.cfg.title if feed else "mail-a-patatina",
+        "site_title": feed.cfg.title if feed else "Mail-A-Patatina",
         "base": f"/{feed.id}" if feed else "",
     }
     return templates.TemplateResponse(request, template, ctx, status_code=status)

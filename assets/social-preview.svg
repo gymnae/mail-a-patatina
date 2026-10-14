@@ -52,7 +52,7 @@
   <path d="M60 78 C55 74 54 70 56 68 C58 66 60.5 67.5 61 69.5 C61.5 67.5 64 66 66 68 C68 70 67 74 60 78 Z" fill="#F07C86" opacity="0.8"/>
 </g>
   <g font-family="Nunito, 'Varela Round', 'Segoe UI', Helvetica, Arial, sans-serif" fill="#5A3A1C">
-    <text x="590" y="296" font-size="76" font-weight="800">mail-a-patatina</text>
+    <text x="590" y="296" font-size="76" font-weight="800">Mail-A-Patatina</text>
     <text x="594" y="364" font-size="34" fill="#7A4E25">Daily family moments from Immich,</text>
     <text x="594" y="410" font-size="34" fill="#7A4E25">delivered by email and chat.</text>
   </g>

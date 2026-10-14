@@ -187,7 +187,7 @@ async def logout(request: Request, csrf: str = Form()):
 
 def page(request: Request, template: str, session: SetupSession | None, status: int = 200, **ctx) -> HTMLResponse:
     s = settings(request)
-    ctx |= {"session": session, "viewer": None, "site_title": "mail-a-patatina", "base": "/setup", "like": LIKE,
+    ctx |= {"session": session, "viewer": None, "site_title": "Mail-A-Patatina", "base": "/setup", "like": LIKE,
             "s": s, "oidc": bool(s.oidc_issuer)}
     return templates.TemplateResponse(request, template, ctx, status_code=status)
 
@@ -752,6 +752,6 @@ async def notify_install_admins(request: Request, subject: str, command: str = A
         return
     body = f"{subject}.\n\nOn the server, run:\n  {command}\n"
     try:
-        await mailer.send(s, mailer.build_simple(s.smtp_from, s.install_admin_emails, f"mail-a-patatina: {subject}", body))
+        await mailer.send(s, mailer.build_simple(s.smtp_from, s.install_admin_emails, f"Mail-A-Patatina: {subject}", body))
     except Exception:
         log.exception("Could not notify the installation admin")

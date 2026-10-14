@@ -4,7 +4,7 @@
 <p class="steps">1. Connect Immich ✓ · <b>2. Album &amp; rules</b> · 3. People &amp; chats</p>
 <h1>Which album, and when?</h1>
 {% if not albums %}
-<p>You don't own any album that isn't shared through mail-a-patatina already. Create one in Immich, then <a href="/setup/new/album">reload</a>.</p>
+<p>You don't own any album that isn't shared through Mail-A-Patatina already. Create one in Immich, then <a href="/setup/new/album">reload</a>.</p>
 {% else %}
 <form method="post" action="/setup/new" class="stack">
   <input type="hidden" name="csrf" value="{{ session.csrf }}">

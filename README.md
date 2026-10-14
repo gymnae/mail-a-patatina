@@ -1,13 +1,13 @@
 <p align="center"><img src="assets/logo.svg" alt="A little potato peeking out of an envelope" width="180"></p>
 
-<h1 align="center">mail-a-patatina</h1>
+<h1 align="center">Mail-A-Patatina</h1>
 
 A self-hosted, ad-free take on Tinybeans for [Immich](https://immich.app). Each morning, relatives get an email with the photos you tagged for sending in a shared Immich album. They tap ❤️ or comment without passwords, and every like and comment lands in Immich under their own name. The same moments can also go to WhatsApp, Signal or Telegram chats.
 
-mail-a-patatina only **transports, presents and collects**. It has no database: everything it knows comes from, or is written back to, Immich.
+Mail-A-Patatina only **transports, presents and collects**. It has no database: everything it knows comes from, or is written back to, Immich.
 
 ```
-             Immich = the single source of truth                 mail-a-patatina (stateless)
+             Immich = the single source of truth                 Mail-A-Patatina (stateless)
  ┌────────────────────────────────────────────────────────┐     ┌──────────────────────────────┐
  │ album "Family Feed"                                    │     │ daily email (your SMTP)      │
  │   photos tagged "Patatina" + description ──────────────┼────►│ WhatsApp / Signal / Telegram │
@@ -37,7 +37,7 @@ mail-a-patatina only **transports, presents and collects**. It has no database: 
 
 Tags belong to one user in Immich, and only a photo's owner can tag it. A co-parent tags their own photos with their own tag of the same name. Nested tags like `Family/Patatina` match too.
 
-**Relatives are Immich users.** Each relative gets a viewer-only Immich account that the album is shared with. When it's set up, `add-relative` creates an API key *for that account* that can only like, comment, take back its own like or comment, and read or change its email setting. It saves the key in `./secrets/relatives.yml`. mail-a-patatina uses that key to like and comment as the person, so their ❤️ and comments show up natively in your Immich app, and your replies in Immich appear on their page too. Relatives never need to know their account exists. This works on OAuth-only servers too: `add-relative` switches password login on for the few seconds it needs, because signing in once is the only way Immich lets anyone create a key for a user.
+**Relatives are Immich users.** Each relative gets a viewer-only Immich account that the album is shared with. When it's set up, `add-relative` creates an API key *for that account* that can only like, comment, take back its own like or comment, and read or change its email setting. It saves the key in `./secrets/relatives.yml`. Mail-A-Patatina uses that key to like and comment as the person, so their ❤️ and comments show up natively in your Immich app, and your replies in Immich appear on their page too. Relatives never need to know their account exists. This works on OAuth-only servers too: `add-relative` switches password login on for the few seconds it needs, because signing in once is the only way Immich lets anyone create a key for a user.
 
 **Magic links.** Every link in the email signs the relative in, using an HMAC-signed token checked against the album's member list:
 - Tapping ❤️ in the email likes the photo. Tapping it again on the page takes the like back, and relatives can delete their own comments.
@@ -57,7 +57,7 @@ Tags belong to one user in Immich, and only a photo's owner can tag it. A co-par
 **What gets sent.** Each photo is marked in Immich when it's sent to each recipient and chat:
 - Failed sends are retried at the next run.
 - Someone newly added to the album catches up on the last `RESEND_HOURS` (default 48).
-- When mail-a-patatina first starts on an album, photos already there count as backlog: they show on the website but aren't sent (`SEND_BACKLOG=true` sends them).
+- When Mail-A-Patatina first starts on an album, photos already there count as backlog: they show on the website but aren't sent (`SEND_BACKLOG=true` sends them).
 - `SEND_MODE=drip` sends one photo per day from the queue instead of a digest.
 
 ## Self-service setup
@@ -74,7 +74,7 @@ Everyone who can sign in to Immich can set up their own family feed at `PUBLIC_U
    - Add relatives by name and email.
    - Add co-parents by pasting a key they created in their own Immich account.
    - Remove a relative: takes them out of the album, since its members are who gets the emails. Their Immich account stays; the admin can delete it.
-   - Remove a co-parent: mail-a-patatina forgets their key and stops sending their photos. Their access to the album in Immich isn't touched.
+   - Remove a co-parent: Mail-A-Patatina forgets their key and stops sending their photos. Their access to the album in Immich isn't touched.
    - **WhatsApp:** link a WhatsApp account of the family's own, by scanning a QR code or typing a pairing code on the phone, like WhatsApp Web. Moments are posted from that account, and its groups are offered to pick from. Use a spare number rather than a personal one, because the server holds the session.
    - **Signal:** add the installation's number to the group and type the group's exact name. The page never lists the number's groups, because those include other families' groups.
    - **Telegram:** add the installation's bot and enter the group's chat id.
@@ -84,7 +84,7 @@ Everyone who can sign in to Immich can set up their own family feed at `PUBLIC_U
 - **The admin is told:** a family's request shows up as "waiting for approval", and `INSTALL_ADMIN_EMAILS` gets an email.
 - **One command approves:** the admin runs `approve`, which creates the accounts as before, with the `patatina-` prefix, no upload quota and their own narrow key.
 - **Then they're live:** the relative appears as "ready" on the setup page and is in the next morning's email. The same goes for the group-chat account a feed needs once a chat is connected.
-- **Removed relatives keep their account** until the admin deletes it. When a family removes someone who is then in no family's album, `INSTALL_ADMIN_EMAILS` gets an email with the command. `forget` deletes the account only if no album at all is shared with it (it signs in as the person to check, so albums shared outside mail-a-patatina count too), and only accounts with the `patatina-` prefix. Immich purges it after its deletion delay, together with the person's old likes and comments. `pending` also lists such accounts.
+- **Removed relatives keep their account** until the admin deletes it. When a family removes someone who is then in no family's album, `INSTALL_ADMIN_EMAILS` gets an email with the command. `forget` deletes the account only if no album at all is shared with it (it signs in as the person to check, so albums shared outside Mail-A-Patatina count too), and only accounts with the `patatina-` prefix. Immich purges it after its deletion delay, together with the person's old likes and comments. `pending` also lists such accounts.
 
 ```sh
 docker compose run --rm -e IMMICH_ADMIN_API_KEY app python -m mail_a_patatina pending
@@ -98,7 +98,7 @@ docker compose run --rm -e IMMICH_ADMIN_API_KEY app python -m mail_a_patatina fo
 ### Pocket ID (or any OIDC provider)
 
 In Pocket ID, add an OIDC client:
-- **Name:** `mail-a-patatina`
+- **Name:** `Mail-A-Patatina`
 - **Callback URL:** `https://<your PUBLIC_URL>/setup/callback`
 - **Optional:** under *allowed user groups*, limit it to the group that may use Immich.
 
@@ -106,7 +106,7 @@ Put its client id and secret into `OIDC_CLIENT_ID` and `OIDC_CLIENT_SECRET`, and
 
 ## Several families on one installation
 
-One mail-a-patatina can serve several Immich users who don't know each other. Families usually set themselves up on the setup page (above); the admin can also define them in a file. Each family is a **feed**: one album, its owner's API key, its own title, send time, timezone, chats and bot account, listed in `config/feeds.yml` (see `feeds.example.yml`). With a single family you can skip that file and put `ALBUM_ID` and `IMMICH_API_KEY` in `.env`.
+One Mail-A-Patatina can serve several Immich users who don't know each other. Families usually set themselves up on the setup page (above); the admin can also define them in a file. Each family is a **feed**: one album, its owner's API key, its own title, send time, timezone, chats and bot account, listed in `config/feeds.yml` (see `feeds.example.yml`). With a single family you can skip that file and put `ALBUM_ID` and `IMMICH_API_KEY` in `.env`.
 
 How families are kept apart:
 - **Separate pages:** each family's pages live under `PUBLIC_URL/<feed id>/`, and the sign-in cookie only applies to that path.
@@ -114,7 +114,7 @@ How families are kept apart:
 - **Every request is checked against one album:** photos, likes and comments are only served if they belong to that feed's album, through that album owner's key.
 - **Separate emails:** a grandma who is in two families' albums has one Immich account, gets two separate emails and has two separate links. Unsubscribing is her own Immich email setting, so it stops both.
 
-Because the families' API keys sit in `config/feeds.yml`, whoever runs mail-a-patatina can read those families' libraries. In practice that's the Immich admin, who can see everything on the server anyway.
+Because the families' API keys sit in `config/feeds.yml`, whoever runs Mail-A-Patatina can read those families' libraries. In practice that's the Immich admin, who can see everything on the server anyway.
 
 ## Installation (admin)
 
@@ -130,7 +130,7 @@ The admin only sets up the installation; families do the rest on the setup page.
 2. **Admin key for approvals** (`IMMICH_ADMIN_API_KEY`): `adminUser.read`, `adminUser.create`, `adminUser.update`, and `adminUser.delete` for `forget`.
    - **Pass it only to the commands that need it, never in `.env`:** `docker compose run --rm -e IMMICH_ADMIN_API_KEY app python -m mail_a_patatina approve`.
    - **OAuth-only Immich servers:** add `adminConfig.read` and `adminConfig.update`. Password login has to be on while an account gets its key, and `approve` switches it on for those few seconds and off again, even if something fails. Without those two permissions, or if your Immich settings come from a config file, it tells you to switch it yourself under *Administration → Settings → Authentication settings*.
-   - **Delete rights, all narrow:** the relatives' `activity.delete` takes back their own like or comment; the album owner's `albumUser.delete` takes a relative out of the album; the admin key's `adminUser.delete` is only used by `forget`, on accounts mail-a-patatina created.
+   - **Delete rights, all narrow:** the relatives' `activity.delete` takes back their own like or comment; the album owner's `albumUser.delete` takes a relative out of the album; the admin key's `adminUser.delete` is only used by `forget`, on accounts Mail-A-Patatina created.
    - **What approved accounts look like:** they appear in Immich as `patatina-Oma Erika` (`USER_PREFIX`). Their storage quota is 0, so they can't upload anything, and their API key can't either. Immich's own album emails are switched off for them, so nobody gets two.
 3. **Reverse proxy:** expose only port 8080, with HTTPS (Caddy, Traefik, nginx…), and set `PUBLIC_URL` to that address. Immich itself never has to be reachable from the internet, because images and videos are proxied.
 4. **Email delivery:** make sure the sending domain has SPF, DKIM and DMARC set up, or the morning email lands in spam.
@@ -198,7 +198,7 @@ docker compose run --rm -e IMMICH_ADMIN_API_KEY app python -m mail_a_patatina --
 
 ## Keep in mind
 
-- **Back up `./secrets` like `.env`.** If the keys are lost, run `add-relative` again for each relative, with password login switched on for a moment. You can see and revoke each key in Immich under the relative's account (*API keys → mail-a-patatina*).
+- **Back up `./secrets` like `.env`.** If the keys are lost, run `add-relative` again for each relative, with password login switched on for a moment. You can see and revoke each key in Immich under the relative's account (*API keys → Mail-A-Patatina*).
 - **`SECRET_KEY`:** it signs the magic links. It also derives the relatives' passwords, which are only used while `add-relative` runs. If you change it, `add-relative` needs `--adopt` for existing relatives.
 - **Immich's own emails:** if Immich's own SMTP is set up, it may still email album *invites*. `add-relative` turns off album update emails for managed accounts, and invites aren't sent because accounts are created with `notify: false`.
 - **Removing a relative:** remove them from the album (their link stops working). Delete the Immich account if you like; their likes and comments go with it.

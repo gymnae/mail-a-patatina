@@ -22,7 +22,7 @@ from .whatsapp import Gateway
 MANUAL_SWITCH = (
     "Switch it on for a moment (Administration → Settings → Authentication settings → Password login), run this "
     "command again, then switch it off again. Or give IMMICH_ADMIN_API_KEY the permissions adminConfig.read and "
-    "adminConfig.update, and mail-a-patatina will do this itself."
+    "adminConfig.update, and Mail-A-Patatina will do this itself."
 )
 log = logging.getLogger("mail_a_patatina.setup")
 
@@ -61,7 +61,7 @@ async def password_login(admin: Immich) -> AsyncIterator[None]:
 async def add_account(
     core: Core, feed: Feed, name: str, email: str, role: str, adopt: bool, wants_email: bool
 ) -> Member:
-    """Create (or adopt) an Immich account, share the feed's album with it, and give mail-a-patatina its own
+    """Create (or adopt) an Immich account, share the feed's album with it, and give Mail-A-Patatina its own
     narrowly scoped API key for it (saved to KEYS_FILE). Needs IMMICH_ADMIN_API_KEY, and password login
     switched on in Immich while this runs (done automatically if the admin key may change settings)."""
     s = core.settings
@@ -102,7 +102,7 @@ async def _setup_account(
             session = await Immich.login(s.immich_url, email, password)
         except LoginFailed:
             raise SystemExit(
-                f"{email} already has an Immich account. Re-run with --adopt to let mail-a-patatina manage it "
+                f"{email} already has an Immich account. Re-run with --adopt to let Mail-A-Patatina manage it "
                 "(this resets its password, so its owner can't sign in to Immich with the old one)."
             ) from None
         user = await admin.admin_update_user(existing["id"], name=immich_name, quotaSizeInBytes=0)
@@ -172,8 +172,8 @@ async def unused_accounts(core: Core) -> list[str]:
 
 async def forget(core: Core, email: str) -> None:
     """Delete the Immich account of a relative no family needs anymore, and its key. Only accounts
-    mail-a-patatina created (named with USER_PREFIX), and only if no album at all is shared with them,
-    including albums outside mail-a-patatina."""
+    Mail-A-Patatina created (named with USER_PREFIX), and only if no album at all is shared with them,
+    including albums outside Mail-A-Patatina."""
     s = core.settings
     email = email.strip().lower()
     if not s.admin_api_key:
@@ -189,7 +189,7 @@ async def forget(core: Core, email: str) -> None:
             print(f"{email} has no Immich account (anymore). Its key, if any, is removed.")
             return
         if not s.user_prefix or not user["name"].startswith(s.user_prefix):
-            raise SystemExit(f"{email} (“{user['name']}”) wasn't created by mail-a-patatina, so it isn't deleted here. "
+            raise SystemExit(f"{email} (“{user['name']}”) wasn't created by Mail-A-Patatina, so it isn't deleted here. "
                              "Delete it in Immich yourself if you mean to.")
         # Only the person themselves can list the albums shared with them.
         async with password_login(admin):

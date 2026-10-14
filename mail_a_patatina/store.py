@@ -53,7 +53,7 @@ class FeedStore:
         tmp = path.with_suffix(".tmp")
         fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
         with os.fdopen(fd, "w", encoding="utf-8") as fh:
-            fh.write("# Written by the mail-a-patatina setup page. Contains an API key: keep private.\n")
+            fh.write("# Written by the Mail-A-Patatina setup page. Contains an API key: keep private.\n")
             yaml.safe_dump(raw, fh, sort_keys=False, allow_unicode=True)
         tmp.replace(path)
 
