@@ -57,6 +57,7 @@ class Settings:
     settle_minutes: int
     resend_hours: int
     photo_link_days: int  # how long a photo in an email stays viewable, for families who keep photos on the server
+    keep_photos_default: bool  # whether families keep their photos on the server unless they switch it off
     smtp_host: str
     smtp_port: int
     smtp_security: str
@@ -100,6 +101,7 @@ class Settings:
             settle_minutes=int(env("SETTLE_MINUTES", "30")),
             resend_hours=int(env("RESEND_HOURS", "48")),
             photo_link_days=int(env("PHOTO_LINK_DAYS", "30")),
+            keep_photos_default=_bool(env("KEEP_PHOTOS_ON_SERVER"), True),
             smtp_host=env("SMTP_HOST", ""),
             smtp_port=int(env("SMTP_PORT", "465" if security == "ssl" else "587")),
             smtp_security=security,
@@ -235,7 +237,7 @@ def feed_config(raw: dict, settings: Settings) -> FeedConfig:
         api_key=str(raw["api_key"]).strip(),
         contributor_keys=_list(raw.get("contributor_keys")),
         require_caption=_bool(raw.get("require_caption", env("REQUIRE_CAPTION")), True),
-        keep_photos_on_server=_bool(raw.get("keep_photos_on_server", env("KEEP_PHOTOS_ON_SERVER")), False),
+        keep_photos_on_server=_bool(raw.get("keep_photos_on_server"), settings.keep_photos_default),
         send_backlog=_bool(raw.get("send_backlog", env("SEND_BACKLOG")), False),
         timezone=str(raw.get("timezone") or env("TZ", "UTC")),
         send_time=str(raw.get("send_time") or env("SEND_TIME", "07:00")),

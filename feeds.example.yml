@@ -8,7 +8,7 @@ feeds:
     title: Die Müllers
     album_id: 00000000-0000-4000-8000-000000000001
     api_key: "album owner's key"     # album.read, asset.read, asset.view, asset.update, activity.read, user.read, albumUser.create, albumUser.delete
-    # keep_photos_on_server: true    # no photo attachments in emails and chats (default: KEEP_PHOTOS_ON_SERVER)
+    # keep_photos_on_server: false   # attach photos to emails and chats (default: KEEP_PHOTOS_ON_SERVER, true)
     # Co-parents who add their own photos: a key from THEIR account with user.read, asset.read, asset.update
     # contributor_keys: ["co-parent's key"]
     timezone: Europe/Berlin
