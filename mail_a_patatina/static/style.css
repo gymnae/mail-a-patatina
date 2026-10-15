@@ -115,6 +115,9 @@ textarea { resize: vertical; }
 .steps { color: var(--muted); font-size: 14px; }
 .panel { background: var(--card); border-radius: 14px; padding: 16px; margin: 16px 0; }
 .panel.danger { border: 1px solid var(--chip-mine); }
+details > summary { cursor: pointer; }
+details.panel > summary h2 { display: inline; margin: 0; }
+details.panel[open] > summary { margin-bottom: 12px; }
 .stack { display: flex; flex-direction: column; gap: 12px; margin: 12px 0; }
 .row { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; margin: 12px 0; }
 .row label { flex: 1 1 180px; }

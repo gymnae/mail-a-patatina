@@ -434,7 +434,7 @@ def contributor_keys(feed) -> dict[str, str]:
 @router.post("/f/{feed_id}/coparents/add")
 async def add_coparent(request: Request, feed_id: str, csrf: str = Form(), api_key: str = Form()):
     """The owner pastes a key the co-parent created in their own Immich account (only a photo's owner
-    can tag it and record that it was sent)."""
+    can record that it was sent)."""
     session = require(request, csrf)
     raw = owned(request, session, feed_id)
     feed = core(request).feeds.get(feed_id)
@@ -458,7 +458,7 @@ async def add_coparent(request: Request, feed_id: str, csrf: str = Form(), api_k
     await core(request).apply_stored(feed_id)
     name = core(request).people.display_name(me["name"])
     return back(feed_id, msg=f"{name}'s key replaced. They can revoke the old one in Immich." if replaced
-                else f"{name} is connected. Their tagged photos are sent too.")
+                else f"{name} is connected. Their photos are sent too.")
 
 
 @router.post("/f/{feed_id}/coparents/remove")

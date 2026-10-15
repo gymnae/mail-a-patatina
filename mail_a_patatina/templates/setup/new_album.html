@@ -1,8 +1,8 @@
 {% extends "setup/layout.html" %}
 {% block page_title %}New feed: album{% endblock %}
 {% block content %}
-<p class="steps">1. Connect Immich ✓ · <b>2. Album &amp; rules</b> · 3. People &amp; chats</p>
-<h1>Which album, and when?</h1>
+<p class="steps">1. Connect Immich ✓ · <b>2. Album</b> · 3. People</p>
+<h1>Which album?</h1>
 {% if not albums %}
 <p>You don't own any album that isn't shared through Mail-A-Patatina already. Create one in Immich, then <a href="/setup/new/album">reload</a>.</p>
 {% else %}
@@ -15,7 +15,10 @@
     {% endfor %}
   </fieldset>
   <label>Title in emails and on the page<input name="title" required maxlength="80" placeholder="e.g. Die Falks"></label>
-  {% include "setup/_rules.html" %}
+  <details>
+    <summary>Options <span class="hint">(daily at 07:00, only photos with a description; can be changed later)</span></summary>
+    {% include "setup/_rules.html" %}
+  </details>
   <button class="primary">Create the feed</button>
 </form>
 {% endif %}

@@ -39,7 +39,6 @@ class Feed:
         self.members: dict[str, Member] = {}  # album members by user id, refreshed on every sync
         self.library = Library()
         self.synced_once = False
-        self.tag_problem: str | None = None  # why tagged photos can't be found, shown on the setup page
         self.refused_keys = 0  # co-parent keys Immich no longer accepts
         self.unkeyed: set[str] = set()  # users with photos in the album but no key here (co-parents to add)
         self.lock = asyncio.Lock()  # this feed's sync and dispatch never overlap

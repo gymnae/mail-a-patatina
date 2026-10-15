@@ -187,7 +187,6 @@ class FeedConfig:
     api_key: str  # the album owner's key
     contributor_keys: list[str]
     require_caption: bool
-    send_tag: str  # the Immich tag that queues a photo for sending (each uploader tags their own photos)
     # Photos are never attached to emails or chat messages: emails load them from this server through
     # expiring links, chats get the caption and a link only.
     keep_photos_on_server: bool
@@ -236,7 +235,6 @@ def feed_config(raw: dict, settings: Settings) -> FeedConfig:
         api_key=str(raw["api_key"]).strip(),
         contributor_keys=_list(raw.get("contributor_keys")),
         require_caption=_bool(raw.get("require_caption", env("REQUIRE_CAPTION")), True),
-        send_tag=str(raw.get("send_tag") or env("SEND_TAG") or "Patatina").strip(),
         keep_photos_on_server=_bool(raw.get("keep_photos_on_server", env("KEEP_PHOTOS_ON_SERVER")), False),
         send_backlog=_bool(raw.get("send_backlog", env("SEND_BACKLOG")), False),
         timezone=str(raw.get("timezone") or env("TZ", "UTC")),

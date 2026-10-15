@@ -8,8 +8,6 @@ import re
 from collections import defaultdict
 from typing import TYPE_CHECKING
 
-import httpx
-
 from .library import BACKLOG, Entry, now
 
 if TYPE_CHECKING:
@@ -33,37 +31,10 @@ def human_caption(description: str | None) -> str:
     return text
 
 
-async def tagged(feed: Feed) -> set[str]:
-    """Ids of the photos their owners tagged with the feed's send tag. Tagging is the explicit "send this"
-    step, so bulk edits or captions never queue anything. Tags are per user in Immich: each key (album
-    owner, co-parents) finds its own tag of that name ("Patatina" or e.g. "Family/Patatina")."""
-    wanted = feed.cfg.send_tag.casefold()
-    ids: set[str] = set()
-    problems = []
-    for user_id, client in feed.writers.items():
-        try:
-            tags = await client.tags()
-        except httpx.HTTPStatusError as e:
-            if e.response.status_code not in (401, 403):
-                raise
-            problems.append(f"a key ({user_id[:8]}…) lacks the tag.read permission")
-            continue
-        for tag in tags:
-            if wanted in (str(tag.get("value", "")).casefold(), str(tag.get("name", "")).casefold()):
-                async for asset in client.search(tagIds=[tag["id"]], withExif=False):
-                    if asset.get("ownerId") == user_id:
-                        ids.add(asset["id"])
-    feed.tag_problem = "; ".join(problems) or None
-    if feed.tag_problem:
-        log.warning("Feed %s: %s, so its tagged photos can't be found", feed.id, feed.tag_problem)
-    return ids
-
-
 async def run(feed: Feed) -> None:
     cfg = feed.cfg
     if not feed.writers:
         await feed.identify_keys()
-    queued = await tagged(feed)
     album = await feed.curator.album(cfg.album_id)
     feed.members = feed.core.people.members(album.get("albumUsers") or [])
     if album.get("isActivityEnabled") is False:
@@ -75,13 +46,11 @@ async def run(feed: Feed) -> None:
         if asset.get("isTrashed") or asset.get("type") not in {"IMAGE", "VIDEO"}:
             continue
         if asset["ownerId"] not in feed.writers:
-            # Without the owner's key we can neither see their tags nor remember what was sent.
+            # Without the owner's key we couldn't remember that it was sent, and would resend it daily.
             unkeyed.add(asset["ownerId"])
             if (feed.id, asset["ownerId"]) not in _warned_owners:
                 log.warning("Feed %s: skipping photos owned by user %s; add their key as co-parent on the setup page", feed.id, asset["ownerId"])
                 _warned_owners.add((feed.id, asset["ownerId"]))
-            continue
-        if asset["id"] not in queued:
             continue
         caption = human_caption((asset.get("exifInfo") or {}).get("description"))
         if cfg.require_caption and not caption:

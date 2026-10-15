@@ -24,11 +24,11 @@ KEY_NAME = "mail-a-patatina"
 # What the album owner's key needs (entered on the setup page). The only delete right is albumUser.delete,
 # which takes someone out of the album (never photos or accounts).
 OWNER_PERMISSIONS = [
-    "album.read", "asset.read", "asset.view", "asset.update", "activity.read", "tag.read", "user.read",
+    "album.read", "asset.read", "asset.view", "asset.update", "activity.read", "user.read",
     "albumUser.create", "albumUser.delete",
 ]
-# What a co-parent's key needs: find their own photos tagged for sending, and record deliveries on them.
-CONTRIBUTOR_PERMISSIONS = ["user.read", "asset.read", "asset.update", "tag.read"]
+# What a co-parent's key needs: record deliveries on their own photos (only an asset's owner may).
+CONTRIBUTOR_PERMISSIONS = ["user.read", "asset.read", "asset.update"]
 
 
 class Immich:
@@ -106,10 +106,6 @@ class Immich:
 
     async def remove_album_user(self, album_id: str, user_id: str) -> None:
         await self._call("DELETE", f"/albums/{album_id}/user/{user_id}")
-
-    async def tags(self) -> list[dict]:
-        """This user's tags (tags are per user in Immich)."""
-        return await self._call("GET", "/tags")
 
     async def search(self, **filters) -> AsyncIterator[dict]:
         """Yield every asset matching the filters, following Immich's pagination."""
