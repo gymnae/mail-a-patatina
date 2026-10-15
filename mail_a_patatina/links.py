@@ -58,6 +58,30 @@ def read_photo_ticket(s: Settings, feed_id: str, asset_id: str, ticket: str) -> 
     return kind, ident
 
 
+INVITE_DAYS = 14
+
+
+def invite_url(s: Settings, feed_id: str, user_id: str, role: str) -> str:
+    """A link for one album member ("coparent" or "relative") to connect their own Immich account by signing
+    in, without the setup page. Only that member's account can use it; it expires after INVITE_DAYS."""
+    expires = int(time.time()) + INVITE_DAYS * 86400
+    payload = f"{role}.{feed_id}.{user_id}.{expires}"
+    return f"{s.public_url}/setup/join/{payload}.{_sign(s, f'invite.{payload}')}"
+
+
+def read_invite(s: Settings, token: str) -> tuple[str, str, str] | None:
+    """-> (role, feed_id, user_id), or None if the invite is forged or expired."""
+    try:
+        role, feed_id, user_id, expires, sig = token.split(".")
+        expired = int(expires) < time.time()
+    except ValueError:
+        return None
+    if (expired or role not in ("coparent", "relative")
+            or not hmac.compare_digest(sig, _sign(s, f"invite.{role}.{feed_id}.{user_id}.{expires}"))):
+        return None
+    return role, feed_id, user_id
+
+
 def derived_password(s: Settings, email: str) -> str:
     """Password of a managed Immich account, derived from SECRET_KEY so it never has to be stored."""
     mac = hmac.new(s.secret_key.encode(), f"immich-password:{email.lower()}".encode(), hashlib.sha256).digest()

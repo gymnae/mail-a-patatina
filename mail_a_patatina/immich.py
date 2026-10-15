@@ -57,6 +57,29 @@ class Immich:
         client.user_id = data["userId"]
         return client
 
+    @staticmethod
+    async def oauth_start(url: str, redirect_uri: str, state: str, code_challenge: str) -> str:
+        """Start Immich's own OAuth login; -> the provider URL to send the browser to. The provider sends
+        it back to `redirect_uri`, which must be allowed for Immich's client there."""
+        async with httpx.AsyncClient(base_url=f"{url}/api", timeout=30) as http:
+            r = await http.post("/oauth/authorize", json={
+                "redirectUri": redirect_uri, "state": state, "codeChallenge": code_challenge})
+        r.raise_for_status()
+        return r.json()["url"]
+
+    @classmethod
+    async def oauth_finish(cls, url: str, callback_url: str, state: str, code_verifier: str) -> Immich:
+        """Complete it with the URL the provider redirected to; -> a session of the user who signed in."""
+        async with httpx.AsyncClient(base_url=f"{url}/api", timeout=30) as http:
+            r = await http.post("/oauth/callback", json={"url": callback_url, "state": state, "codeVerifier": code_verifier})
+        if r.status_code in (400, 401):
+            raise LoginFailed(f"Immich: {r.json().get('message', r.status_code)}")
+        r.raise_for_status()
+        data = r.json()
+        client = cls(url, token=data["accessToken"])
+        client.user_id = data["userId"]
+        return client
+
     async def aclose(self) -> None:
         await self.http.aclose()
 

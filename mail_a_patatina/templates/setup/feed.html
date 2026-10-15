@@ -5,7 +5,7 @@
 <p class="hint">{{ moments }} moment(s) shared · sends every day at {{ raw.send_time }} ({{ raw.timezone }}) ·
   <a href="{{ link }}" target="_blank" rel="noopener">{{ link }}</a></p>
 
-{% if skipped %}<p class="notice error" role="alert">Photos by {{ skipped | join(", ") }} aren't sent: Immich only lets a photo's owner record that it was sent. Add a key from them under “Co-parents” below.</p>{% endif %}
+{% if skipped %}<p class="notice error" role="alert">Photos by {{ skipped | join(", ") }} aren't sent: Immich only lets a photo's owner record that it was sent. Connect them under “Co-parents” below.</p>{% endif %}
 {% if feed and feed.refused_keys %}<p class="notice error" role="alert">Immich refused {{ feed.refused_keys }} co-parent key(s), probably revoked. Add a new key under “Co-parents” below.</p>{% endif %}
 <section class="panel">
   <p><b>To share a photo:</b> add it to the album in Immich{% if raw.require_caption is not false %} and write a description{% endif %}.
@@ -27,9 +27,13 @@
             onsubmit='return confirm({{ ("Remove " ~ m.name ~ " from the album? They get nothing more, and their links stop working.") | tojson }})'>
         <input type="hidden" name="csrf" value="{{ session.csrf }}"><input type="hidden" name="user_id" value="{{ m.id }}">
         <button class="link">remove</button></form>
-      {% if not m.ready %}
+      {% if m.invite %}
+      <div class="invite">Send {{ m.name }} this link, so they can connect their Immich account (valid {{ invite_days }} days):
+        <input readonly value="{{ m.invite }}" onclick="this.select()" aria-label="Invite link for {{ m.name }}"></div>
+      {% endif %}
+      {% if not m.ready and not m.managed %}
       <details>
-        <summary>add key, for emails and reactions</summary>
+        <summary>{% if m.invite %}or add a key by hand{% else %}add key, for emails and reactions{% endif %}</summary>
         <ol class="guide">
           <li>Ask {{ m.name }} to open <a href="{{ s.immich_public_url }}/user-settings?isOpen=api-keys" target="_blank" rel="noopener">Immich → Account settings → API keys</a>,
             create a key named <code>mail-a-patatina</code> with exactly these permissions, and send it to you:
@@ -133,7 +137,7 @@
 
 <details class="panel">
   <summary><h2>Co-parents</h2> <span class="hint">someone else who adds photos</span></summary>
-  <p class="hint">Like the other parent. Immich only lets a photo's owner record that it was sent, so their photos go out once you add a key from <i>their</i> account here.</p>
+  <p class="hint">Like the other parent. Immich only lets a photo's owner record that it was sent, so their photos go out once they've connected <i>their</i> account{% if immich_oauth %}: send them the link below{% else %} and you've added their key here{% endif %}.</p>
   <ul class="people">
     {% for c in coparents %}
     <li>{% if c.name is defined %}<b>{{ c.name }}</b> <span class="hint">{{ c.email }}</span>{% set uid = c.id %}
@@ -142,12 +146,16 @@
             onsubmit='return confirm({{ ("Remove " ~ (c.name if c.name is defined else "this co-parent") ~ "? Their photos stop being sent. Their access to the album in Immich stays as it is.") | tojson }})'>
         <input type="hidden" name="csrf" value="{{ session.csrf }}"><input type="hidden" name="user_id" value="{{ uid }}">
         <button class="link">remove</button></form></li>
-    {% else %}
-    <li class="hint">None.</li>
     {% endfor %}
+    {% for w in waiting_coparents %}
+    <li><b>{{ w.name }}</b> <span class="hint">{{ w.email }}</span> <span class="tag wait">not connected</span>
+      {% if w.invite %}<div class="invite">Send {{ w.name }} this link (valid {{ invite_days }} days):
+        <input readonly value="{{ w.invite }}" onclick="this.select()" aria-label="Invite link for {{ w.name }}"></div>{% endif %}</li>
+    {% endfor %}
+    {% if not coparents and not waiting_coparents %}<li class="hint">None. Share the album with them in Immich as editor, and they appear here.</li>{% endif %}
   </ul>
   <details>
-    <summary>Add a co-parent</summary>
+    <summary>{% if immich_oauth %}Add a co-parent by hand{% else %}Add a co-parent{% endif %}</summary>
     <ol class="guide">
       <li>Share the album with them in Immich as <b>editor</b>, so they can add photos.</li>
       <li>Ask them to open <a href="{{ s.immich_public_url }}/user-settings?isOpen=api-keys" target="_blank" rel="noopener">Immich → Account settings → API keys</a>
@@ -175,7 +183,14 @@
 
 <details class="panel">
   <summary><h2>Immich key</h2></summary>
-  <p class="hint">Replace it if you revoked or rotated it in Immich. Same rules as when you set up the feed.</p>
+  <p class="hint">Connect again if you revoked or rotated the key in Immich, or if sending stopped working.</p>
+  {% if immich_oauth %}
+  <form method="post" action="/setup/immich/connect" class="stack">
+    <input type="hidden" name="csrf" value="{{ session.csrf }}"><input type="hidden" name="feed_id" value="{{ raw.id }}">
+    <button>Connect with Immich again</button>
+  </form>
+  <p class="hint">Or paste a key you created by hand, with the same permissions as when you set up the feed:</p>
+  {% endif %}
   <form method="post" action="/setup/f/{{ raw.id }}/key" class="row">
     <input type="hidden" name="csrf" value="{{ session.csrf }}">
     <label>New API key<input name="api_key" type="password" required autocomplete="off"></label>

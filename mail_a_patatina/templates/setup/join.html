@@ -1,0 +1,19 @@
+{% extends "setup/layout.html" %}
+{% block page_title %}{{ raw.title }}{% endblock %}
+{% block content %}
+<div class="hero">
+  <img src="/static/favicon.svg" alt="" width="96" height="96">
+  <h1>Hello {{ member.name }}!</h1>
+  {% if role == "coparent" %}
+  <p>So that the photos you add to the album “{{ raw.title }}” reach the family too, connect your Immich account once.</p>
+  {% else %}
+  <p>To get “{{ raw.title }}” by email every morning, and to like and comment on the photos, connect your Immich account once.</p>
+  {% endif %}
+</div>
+<form method="post" action="/setup/join/{{ token }}" class="center">
+  <button class="primary">Connect with Immich</button>
+</form>
+<p class="hint center">You sign in to Immich as usual. Mail-A-Patatina never sees your password; it only gets a key that can do just this
+  ({% if role == "coparent" %}note which of your photos in the album were sent{% else %}send you the email, and post your likes and comments{% endif %}).
+  You can revoke it any time in Immich under Account settings → API keys.</p>
+{% endblock %}

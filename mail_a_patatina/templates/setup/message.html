@@ -3,5 +3,5 @@
 {% block content %}
 <h1>{{ title }}</h1>
 <p>{{ text }}</p>
-<p><a class="button" href="/setup/">Back</a></p>
+{% if home is not defined or home %}<p><a class="button" href="/setup/">Back</a></p>{% endif %}
 {% endblock %}

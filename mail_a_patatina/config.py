@@ -53,6 +53,9 @@ class Settings:
     oidc_client_secret: str
     oidc_name: str
     install_admin_emails: list[str]
+    # Create keys by signing in to Immich through its OAuth login, instead of pasting them (only used while
+    # Immich has OAuth login on). Needs PUBLIC_URL/setup/immich-callback allowed for Immich's client at the provider.
+    immich_oauth_connect: bool
     sync_minutes: int
     settle_minutes: int
     resend_hours: int
@@ -97,6 +100,7 @@ class Settings:
             oidc_client_secret=env("OIDC_CLIENT_SECRET", ""),
             oidc_name=env("OIDC_NAME", "Pocket ID"),
             install_admin_emails=_list(env("INSTALL_ADMIN_EMAILS")),
+            immich_oauth_connect=_bool(env("IMMICH_OAUTH_CONNECT"), True),
             sync_minutes=int(env("SYNC_MINUTES", "15")),
             settle_minutes=int(env("SETTLE_MINUTES", "30")),
             resend_hours=int(env("RESEND_HOURS", "48")),

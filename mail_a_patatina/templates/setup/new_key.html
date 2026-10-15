@@ -3,7 +3,16 @@
 {% block content %}
 <p class="steps"><b>1. Connect Immich</b> · 2. Album · 3. People</p>
 <h1>Connect your Immich album</h1>
-<p>Mail-A-Patatina reads your album and marks which photos it has sent, with a key you create in Immich. It never sees your password.</p>
+<p>Mail-A-Patatina reads your album and marks which photos it has sent, with a key from your Immich account. It never sees your password.</p>
+{% if immich_oauth %}
+<form method="post" action="/setup/immich/connect" class="stack">
+  <input type="hidden" name="csrf" value="{{ session.csrf }}">
+  <button class="primary">Connect with Immich</button>
+</form>
+<p class="hint">You sign in to Immich as usual, and the key is created for you with exactly the rights it needs.</p>
+<details{% if manual %} open{% endif %}>
+<summary>Or create the key by hand</summary>
+{% endif %}
 <ol class="guide">
   <li>Open <a href="{{ s.immich_public_url }}/user-settings?isOpen=api-keys" target="_blank" rel="noopener">Immich → Account settings → API keys</a> and choose <b>New API key</b>.</li>
   <li>Name it <code>mail-a-patatina</code>.</li>
@@ -18,4 +27,5 @@
   <button class="primary">Check the key</button>
 </form>
 <p class="hint">The key must belong to the account you signed in with ({{ session.email }}). Keys that can delete anything else or administer Immich are refused.</p>
+{% if immich_oauth %}</details>{% endif %}
 {% endblock %}

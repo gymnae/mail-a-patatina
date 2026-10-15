@@ -28,9 +28,9 @@ from fastapi.templating import Jinja2Templates
 
 from . import dispatch, mailer
 from .config import CHAT_KINDS
-from .immich import CONTRIBUTOR_PERMISSIONS, OWNER_PERMISSIONS, RELATIVE_PERMISSIONS, Immich
+from .immich import CONTRIBUTOR_PERMISSIONS, KEY_NAME, OWNER_PERMISSIONS, RELATIVE_PERMISSIONS, Immich, LoginFailed
 from .library import now
-from .links import LIKE, make_token, nice_date
+from .links import INVITE_DAYS, LIKE, invite_url, make_token, nice_date, read_invite
 from .people import save_key
 from .whatsapp import Gateway, GatewayError
 
@@ -61,6 +61,10 @@ SESSIONS: dict[str, SetupSession] = {}
 LINKING: dict[str, tuple[str, str, float]] = {}
 PHONE = re.compile(r"^\+?[0-9 ()/-]{6,24}$")
 PENDING_LOGINS: dict[str, tuple[str, float]] = {}  # OIDC state -> (PKCE verifier, started)
+# Immich OAuth state -> (PKCE verifier, what binds it to the browser that started it: the setup session's csrf,
+# or the invite cookie; feed id, "" for a new feed, or "join:<invite token>"; started)
+IMMICH_LOGINS: dict[str, tuple[str, str, str, float]] = {}
+JOIN_COOKIE = "map_join"
 _discovery: dict | None = None
 
 
@@ -251,7 +255,7 @@ async def check_owner_key(request: Request, key: str, email: str) -> tuple[dict 
 @router.get("/new", response_class=HTMLResponse)
 async def new_key(request: Request):
     session = require(request)
-    return page(request, "setup/new_key.html", session, permissions=OWNER_PERMISSIONS)
+    return page(request, "setup/new_key.html", session, permissions=OWNER_PERMISSIONS, immich_oauth=await immich_oauth(request))
 
 
 @router.post("/new/key")
@@ -259,9 +263,224 @@ async def new_key_post(request: Request, csrf: str = Form(), api_key: str = Form
     session = require(request, csrf)
     _, problem = await check_owner_key(request, api_key.strip(), session.email)
     if problem:
-        return page(request, "setup/new_key.html", session, 422, permissions=OWNER_PERMISSIONS, error=problem)
+        return page(request, "setup/new_key.html", session, 422, permissions=OWNER_PERMISSIONS, immich_oauth=await immich_oauth(request), error=problem)
     session.draft_key = api_key.strip()
     return RedirectResponse("/setup/new/album", status_code=303)
+
+
+# --- the owner's key, created by signing in to Immich (IMMICH_OAUTH_CONNECT) ----------------
+#
+# Instead of having people create a key and tick its permissions by hand, the setup page runs Immich's own
+# OAuth login for them, uses the resulting session for a few seconds to create exactly the key the feed
+# needs, and signs that session out again. Only the narrow key is kept.
+
+
+_oauth: tuple[float, bool] | None = None  # (when checked, whether Immich offers OAuth login)
+
+
+async def immich_oauth(request: Request) -> bool:
+    """IMMICH_OAUTH_CONNECT, and only while Immich actually signs people in through OAuth (checked every
+    10 minutes), so nobody gets a button that can't work."""
+    global _oauth
+    s = settings(request)
+    if not s.immich_oauth_connect:
+        return False
+    if _oauth is None or time.monotonic() - _oauth[0] > 600:
+        client = Immich(s.immich_url)
+        try:
+            enabled = bool((await client.server_features()).get("oauth"))
+        except httpx.HTTPError:
+            enabled = _oauth[1] if _oauth else False
+        finally:
+            await client.aclose()
+        _oauth = (time.monotonic(), enabled)
+    return _oauth[1]
+
+
+def pkce() -> tuple[str, str]:
+    verifier = secrets.token_urlsafe(48)
+    return verifier, base64.urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest()).decode().rstrip("=")
+
+
+@router.post("/immich/connect")
+async def immich_connect(request: Request, csrf: str = Form(), feed_id: str = Form("")):
+    session = require(request, csrf)
+    s = settings(request)
+    if not await immich_oauth(request):
+        raise HTTPException(404)
+    if feed_id:
+        owned(request, session, feed_id)
+    for state, pending in list(IMMICH_LOGINS.items()):
+        if time.monotonic() - pending[3] > LOGIN_SECONDS:
+            IMMICH_LOGINS.pop(state, None)
+    state, (verifier, challenge) = secrets.token_urlsafe(24), pkce()
+    try:
+        url = await Immich.oauth_start(s.immich_url, f"{s.public_url}/setup/immich-callback", state, challenge)
+    except httpx.HTTPError as e:
+        log.warning("Immich OAuth start failed: %s", e)
+        return connect_failed(request, session, feed_id, "Immich didn't offer its sign-in. Create a key by hand instead.")
+    IMMICH_LOGINS[state] = (verifier, session.csrf, feed_id, time.monotonic())
+    return RedirectResponse(url, status_code=303)
+
+
+@router.get("/immich-callback")
+async def immich_callback(request: Request, state: str = "", error: str = ""):
+    pending = IMMICH_LOGINS.pop(state, None)
+    if pending is None or time.monotonic() - pending[3] > LOGIN_SECONDS:
+        return page(request, "setup/message.html", current(request), title="That didn't work", text="Please start again.")
+    verifier, binding, feed_id, _ = pending
+    if feed_id.startswith("join:"):
+        return await finish_join(request, feed_id[len("join:"):], binding, state, verifier, error)
+    session = require(request)
+    if binding != session.csrf:
+        return page(request, "setup/message.html", session, title="That didn't work", text="Please start again.")
+    if error:
+        return connect_failed(request, session, feed_id, "The sign-in to Immich was cancelled.")
+    s = settings(request)
+    raw = owned(request, session, feed_id) if feed_id else None
+    try:
+        immich = await Immich.oauth_finish(s.immich_url, f"{s.public_url}/setup/immich-callback?{request.url.query}",
+                                           state, verifier)
+    except (httpx.HTTPError, LoginFailed) as e:
+        log.warning("Immich OAuth callback failed: %s", e)
+        return connect_failed(request, session, feed_id, "Immich didn't accept the sign-in. Create a key by hand instead.")
+    try:
+        me = await immich.me()
+        if me["email"].lower() != session.email:
+            return connect_failed(request, session, feed_id,
+                                  f"You signed in to Immich as {me['email']}, but to this page as {session.email}.")
+        key = await immich.create_api_key(KEY_NAME, OWNER_PERMISSIONS)
+        if raw:
+            await delete_old_key(immich, raw["api_key"])
+    finally:
+        await immich.logout()
+        await immich.aclose()
+    log.info("Immich key for %s created through OAuth (%s)", session.email, feed_id or "new feed")
+    if raw:
+        raw["api_key"] = key
+        core(request).store.save(raw)
+        await core(request).apply_stored(feed_id)
+        return back(feed_id, msg="Connected to Immich anew. The old key is removed.")
+    session.draft_key = key
+    return RedirectResponse("/setup/new/album", status_code=303)
+
+
+async def delete_old_key(immich: Immich, old_key: str) -> None:
+    """Remove the key a feed used before, if Immich still knows it (it may have been revoked already)."""
+    old = Immich(immich.url, api_key=old_key)
+    try:
+        await immich.delete_api_key((await old.api_key_info())["id"])
+    except httpx.HTTPError:
+        pass
+    finally:
+        await old.aclose()
+
+
+# --- invite links: co-parents and relatives with their own Immich account connect it themselves ----------
+#
+# The family sends one person a link. They sign in to Immich (no setup page, no key to create), and the key
+# they need is created in their own account: a co-parent's lets their photos be marked as sent, a relative's
+# lets them get emails and like and comment. The link works only for the album member it was made for.
+
+
+def invitation(request: Request, token: str):
+    """-> (role, the feed's settings, feed, member) for a valid invite, else None."""
+    parsed = read_invite(settings(request), token)
+    if parsed is None:
+        return None
+    role, feed_id, user_id = parsed
+    raw = core(request).store.get(feed_id) if re.match(r"^[a-z0-9-]{1,32}$", feed_id) else None
+    feed = core(request).feeds.get(feed_id)
+    member = feed.members.get(user_id) if feed else None
+    if raw is None or member is None or member.role == "owner":
+        return None
+    return role, raw, feed, member
+
+
+def join_message(request: Request, title: str, text: str) -> HTMLResponse:
+    return page(request, "setup/message.html", None, title=title, text=text, home=False)
+
+
+@router.get("/join/{token}", response_class=HTMLResponse)
+async def join_page(request: Request, token: str):
+    invite = invitation(request, token)
+    if invite is None or not await immich_oauth(request):
+        return join_message(request, "This link doesn't work anymore", "Ask the family for a new one.")
+    role, raw, _, member = invite
+    return page(request, "setup/join.html", None, raw=raw, member=member, role=role, token=token)
+
+
+@router.post("/join/{token}")
+async def join_start(request: Request, token: str):
+    """A POST, so that link scanners in mail and chat apps can't start the sign-in."""
+    s = settings(request)
+    if invitation(request, token) is None or not await immich_oauth(request):
+        return join_message(request, "This link doesn't work anymore", "Ask the family for a new one.")
+    nonce = secrets.token_urlsafe(24)
+    state, (verifier, challenge) = secrets.token_urlsafe(24), pkce()
+    try:
+        url = await Immich.oauth_start(s.immich_url, f"{s.public_url}/setup/immich-callback", state, challenge)
+    except httpx.HTTPError as e:
+        log.warning("Immich OAuth start failed: %s", e)
+        return join_message(request, "Immich isn't answering", "Please try again later.")
+    IMMICH_LOGINS[state] = (verifier, nonce, f"join:{token}", time.monotonic())
+    response = RedirectResponse(url, status_code=303)
+    response.set_cookie(JOIN_COOKIE, nonce, max_age=LOGIN_SECONDS, path="/setup", httponly=True, samesite="lax",
+                        secure=s.secure_cookies)
+    return response
+
+
+async def finish_join(request: Request, token: str, nonce: str, state: str, verifier: str, error: str) -> Response:
+    if not secrets.compare_digest(request.cookies.get(JOIN_COOKIE, ""), nonce):
+        return join_message(request, "That didn't work", "Please open the link again, in this browser.")
+    invite = invitation(request, token)
+    if invite is None:
+        return join_message(request, "This link doesn't work anymore", "Ask the family for a new one.")
+    if error:
+        return join_message(request, "Sign-in cancelled", "Open the link again whenever you like.")
+    role, raw, feed, member = invite
+    c, s = core(request), settings(request)
+    try:
+        immich = await Immich.oauth_finish(s.immich_url, f"{s.public_url}/setup/immich-callback?{request.url.query}",
+                                           state, verifier)
+    except (httpx.HTTPError, LoginFailed) as e:
+        log.warning("Immich OAuth callback failed: %s", e)
+        return join_message(request, "That didn't work", "Immich didn't accept the sign-in. Please try again later.")
+    try:
+        me = await immich.me()
+        if me["id"] != member.id:
+            return join_message(request, "Wrong account",
+                                f"This link is for {member.name} ({member.email}), but you signed in to Immich as {me['email']}.")
+        key = await immich.create_api_key(KEY_NAME, CONTRIBUTOR_PERMISSIONS if role == "coparent" else RELATIVE_PERMISSIONS)
+        old = contributor_keys(feed).get(member.id) if role == "coparent" else c.people.keys.get(member.email)
+        if old:
+            await delete_old_key(immich, old)
+    finally:
+        await immich.logout()
+        await immich.aclose()
+    log.info("%s connected to %s as %s through an invite", member.email, raw["id"], role)
+    if role == "coparent":
+        keys = contributor_keys(feed) | {member.id: key}
+        raw["contributor_keys"] = list(keys.values())
+        c.store.save(raw)
+        await c.apply_stored(raw["id"])
+        text = (f"Photos you add to the album “{raw['title']}” are shared with the family now"
+                + (", once you've written a description." if raw.get("require_caption", True) else "."))
+    else:
+        save_key(s.keys_file, member.email, key)
+        await c.people.reload_keys()
+        text = f"You'll get “{raw['title']}” by email, and can like and comment on every photo."
+    response = join_message(request, f"Thanks, {member.name}!", text)
+    response.delete_cookie(JOIN_COOKIE, path="/setup")
+    return response
+
+
+def connect_failed(request: Request, session: SetupSession, feed_id: str, problem: str) -> Response:
+    if feed_id:
+        return back(feed_id, error=problem)
+    # Only reached after an Immich sign-in was tried, so the button stays (with the manual steps opened).
+    return page(request, "setup/new_key.html", session, 422, permissions=OWNER_PERMISSIONS, immich_oauth=True,
+                error=problem, manual=True)
 
 
 async def own_albums(request: Request, key: str) -> list[dict]:
@@ -349,14 +568,22 @@ async def feed_page(request: Request, feed_id: str, msg: str = "", error: str = 
             await feed.refresh_members()  # ...and shared the album with them
         except httpx.HTTPError:
             log.exception("Reading the members of %s", feed_id)
-    members = []
-    if feed is not None:
-        uploaders = set(contributor_keys(feed)) | feed.unkeyed
-        for m in feed.relatives():
-            if m.id not in uploaders:  # co-parents, with or without a key here: listed under co-parents
-                members.append({"id": m.id, "name": m.name, "email": m.email, "ready": m.email in c.people.keys,
-                                "managed": m.managed})
     s = c.settings
+    invites = await immich_oauth(request)
+    members, waiting_coparents = [], []
+    if feed is not None:
+        keyed = contributor_keys(feed)
+        for m in feed.relatives():
+            if m.id in keyed:
+                continue  # listed under co-parents
+            if m.id in feed.unkeyed or (m.role == "editor" and not m.managed):
+                # adds photos (or may): a co-parent still to connect
+                waiting_coparents.append({"id": m.id, "name": m.name, "email": m.email,
+                                          "invite": invite_url(s, feed_id, m.id, "coparent") if invites else None})
+                continue
+            ready = m.email in c.people.keys
+            members.append({"id": m.id, "name": m.name, "email": m.email, "ready": ready, "managed": m.managed,
+                            "invite": invite_url(s, feed_id, m.id, "relative") if invites and not ready and not m.managed else None})
     channels = [k for k in ("signal", "telegram") if {"signal": s.signal_url and s.signal_number,
                                                       "telegram": s.telegram_token}[k]]
     whatsapp, whatsapp_down = None, False  # the family's own linked account, with its groups
@@ -378,7 +605,8 @@ async def feed_page(request: Request, feed_id: str, msg: str = "", error: str = 
                    for uid in feed.unkeyed]
     return page(
         request, "setup/feed.html", session, raw=raw, feed=feed, members=members, channels=channels,
-        coparents=coparents, skipped=skipped, coparent_permissions=CONTRIBUTOR_PERMISSIONS,
+        coparents=coparents, skipped=skipped, coparent_permissions=CONTRIBUTOR_PERMISSIONS, immich_oauth=invites,
+        waiting_coparents=waiting_coparents, invite_days=INVITE_DAYS,
         relative_permissions=RELATIVE_PERMISSIONS,
         whatsapp=whatsapp, whatsapp_down=whatsapp_down,
         timezones=TIMEZONES, msg=msg, error=error, link=f"{s.public_url}/{feed_id}/",

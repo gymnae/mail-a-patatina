@@ -68,14 +68,14 @@ Mail-A-Patatina only **transports, presents and collects**. It has no database: 
 Everyone who can sign in to Immich can set up their own family feed at `PUBLIC_URL/setup/`, with no help from the admin:
 
 1. **Sign in** with your identity provider (e.g. Pocket ID), the same account as for Immich.
-2. **Connect Immich:** the page links to Immich's API-key screen and lists the eight permissions to tick. The pasted key is checked:
+2. **Connect Immich:** if Immich signs in through OAuth, one button: people sign in to Immich as usual, and the page creates the key with exactly the right permissions (see *Pocket ID* below). Otherwise, or as a fallback, the page links to Immich's API-key screen and lists the eight permissions to tick. Either way the key is checked:
    - it must belong to the same email address,
    - it must have exactly what the feed needs,
    - it must not be able to administer Immich or delete anything, except take people out of the album (`albumUser.delete`).
 3. **Album and rules:** pick one of your own albums, a title, the sending time and timezone, digest or one-a-day, whether only captioned photos go out, and whether you want an email when someone comments.
 4. **People and chats:**
    - Add relatives by name and email.
-   - Add co-parents by pasting a key they created in their own Immich account.
+   - Connect co-parents, and relatives who have an Immich account of their own: if Immich signs in through OAuth, the page shows a link for each of them to send (valid 14 days). They open it, sign in to Immich, and are connected; they never see the setup page. Otherwise, paste a key they created in their own account.
    - Remove a relative: takes them out of the album, since its members are who gets the emails. Their Immich account stays; the admin can delete it.
    - Remove a co-parent: Mail-A-Patatina forgets their key and stops sending their photos. Their access to the album in Immich isn't touched.
    - **WhatsApp:** link a WhatsApp account of the family's own, by scanning a QR code or typing a pairing code on the phone, like WhatsApp Web. Moments are posted from that account, and its groups are offered to pick from. Use a spare number rather than a personal one, because the server holds the session.
@@ -87,7 +87,7 @@ Everyone who can sign in to Immich can set up their own family feed at `PUBLIC_U
 - **The admin is told:** a family's request shows up as "waiting for approval", and `INSTALL_ADMIN_EMAILS` gets an email.
 - **One command approves:** the admin runs `approve`, which creates the accounts as before, with the `patatina-` prefix, no upload quota and their own narrow key.
 - **Then they're live:** the relative appears as "ready" on the setup page and is in the next morning's email. The same goes for the group-chat account a feed needs once a chat is connected.
-- **Relatives with an Immich account of their own** keep it untouched: no new account, no password reset. The album is shared with their account (right away from the setup page if Immich shows other users to non-admins, otherwise by `approve`). For emails and reactions they create a key in their account with the six relative permissions, and the family pastes it under *People → add key*. Removing them later only drops that key. (`add-relative --adopt` still takes an account over instead, if you really want that.)
+- **Relatives with an Immich account of their own** keep it untouched: no new account, no password reset. The album is shared with their account (right away from the setup page if Immich shows other users to non-admins, otherwise by `approve`). For emails and reactions they need a key in their own account: the family sends them the invite link from *People* (if Immich signs in through OAuth), or they create a key with the six relative permissions and the family pastes it. Removing them later only drops that key. (`add-relative --adopt` still takes an account over instead, if you really want that.)
 - **Removed relatives keep their account** until the admin deletes it. When a family removes someone who is then in no family's album, `INSTALL_ADMIN_EMAILS` gets an email with the command. `forget` deletes the account only if no album at all is shared with it (it signs in as the person to check, so albums shared outside Mail-A-Patatina count too), and only accounts with the `patatina-` prefix. Immich purges it after its deletion delay, together with the person's old likes and comments. `pending` also lists such accounts.
 
 ```sh
@@ -106,7 +106,14 @@ In Pocket ID, add an OIDC client:
 - **Callback URL:** `https://<your PUBLIC_URL>/setup/callback`
 - **Optional:** under *allowed user groups*, limit it to the group that may use Immich.
 
-Put its client id and secret into `OIDC_CLIENT_ID` and `OIDC_CLIENT_SECRET`, and Pocket ID's URL into `OIDC_ISSUER`. The login uses the authorization-code flow with PKCE and asks for `openid email profile`. The email address it returns is matched against the Immich account of the key a person pastes.
+Put its client id and secret into `OIDC_CLIENT_ID` and `OIDC_CLIENT_SECRET`, and Pocket ID's URL into `OIDC_ISSUER`. The login uses the authorization-code flow with PKCE and asks for `openid email profile`. The email address it returns is matched against the Immich account of the feed's key.
+
+**"Connect with Immich" instead of pasting a key** (on by default whenever Immich has OAuth login switched on; `IMMICH_OAUTH_CONNECT=false` turns it off):
+- **One more callback, required:** in Pocket ID, open **Immich's** client (not Mail-A-Patatina's) and add `https://<your PUBLIC_URL>/setup/immich-callback` to its callback URLs.
+- **What happens:** the setup page starts Immich's own OAuth login (with PKCE). The provider sends the person back to the setup page, which completes the login with Immich. Immich does the checking, so Mail-A-Patatina never handles a password or the provider's tokens.
+- **What's kept:** for a few seconds, the server holds a normal Immich session of that person. It uses it only to check the email address, create the key with exactly the eight permissions (and, when reconnecting, delete the feed's old key), and then signs the session out. Only the narrow key is stored.
+- **If it fails** (the callback isn't allowed, Immich's OAuth is off, or Immich changed its OAuth API), the page falls back to creating the key by hand.
+- **Invite links** for co-parents and relatives with their own account use the same login. A link is signed for one album member and one role, works only if exactly that Immich account signs in, expires after 14 days (or with `LINK_VERSION`), and only starts the sign-in on a button press, so link scanners in mail apps can't trigger it.
 
 ## Several families on one installation
 
@@ -139,7 +146,7 @@ The admin only sets up the installation; families do the rest on the setup page.
 3. **Reverse proxy:** expose only port 8080, with HTTPS (Caddy, Traefik, nginx…), and set `PUBLIC_URL` to that address. Immich itself never has to be reachable from the internet, because images and videos are proxied.
 4. **Email delivery:** make sure the sending domain has SPF, DKIM and DMARC set up, or the morning email lands in spam.
 
-**Co-parents who add their own photos:** Immich only lets a photo's owner write its metadata, where Mail-A-Patatina records what was sent. So the co-parent creates a key in *their own* account with exactly `user.read`, `asset.read` and `asset.update` and gives it to the parent who set up the feed. That parent pastes it under *Co-parents* on the setup page; the co-parent never signs in there. The key must belong to someone the album is shared with. Until a key is added, their photos are skipped, and the setup page says whose. For families in `feeds.yml`, the admin lists the keys under `contributor_keys`.
+**Co-parents who add their own photos:** Immich only lets a photo's owner write its metadata, where Mail-A-Patatina records what was sent. So the co-parent needs a key in *their own* account. Once the album is shared with them in Immich as editor, they show up under *Co-parents*. If Immich signs in through OAuth, the parent sends them the link shown there; they sign in to Immich once and the key (`user.read`, `asset.read`, `asset.update`) is created for them. Otherwise they create that key themselves and the parent pastes it. Either way the co-parent never signs in to the setup page. The key must belong to someone the album is shared with. Until a key is added, their photos are skipped, and the setup page says whose. For families in `feeds.yml`, the admin lists the keys under `contributor_keys`.
 
 **Families defined by the admin** instead of on the setup page also still work: `config/feeds.yml`, or `ALBUM_ID` in `.env` for a single family, with `add-relative` and `add-bot` on the CLI. `add-relative --adopt` takes over an existing Immich account, which resets its password, so don't adopt anyone who signs in to Immich themselves.
 
