@@ -37,3 +37,9 @@ for (const box of document.querySelectorAll(".live")) {
   });
   box.addEventListener("contextmenu", (e) => e.preventDefault());
 }
+
+// Families that keep their photos on the server: no "Save video as…" on right-click. (Images already
+// let clicks through to the link or page behind them, so their menu has no "Save image".)
+if (document.body.classList.contains("protect")) {
+  document.addEventListener("contextmenu", (e) => { if (e.target.closest("video")) e.preventDefault(); });
+}

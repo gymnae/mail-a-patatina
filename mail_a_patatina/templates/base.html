@@ -12,7 +12,7 @@
   <script src="/static/live.js" defer></script>
   {% block head %}{% endblock %}
 </head>
-<body>
+<body{% if protect %} class="protect"{% endif %}>
   <header class="top">
     <a class="brand" href="{{ base }}/"><img src="/static/favicon.svg" alt="" width="36" height="36">{{ site_title }}</a>
     {% block nav %}{% if viewer %}

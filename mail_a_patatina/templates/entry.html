@@ -4,7 +4,7 @@
 <article class="moment">
   <figure>
     {% if entry.type == "VIDEO" %}
-    <video controls playsinline preload="none" poster="{{ base }}/media/{{ entry.asset_id }}/preview" src="{{ base }}/video/{{ entry.asset_id }}"></video>
+    <video controls playsinline preload="none"{% if protect %} controlslist="nodownload"{% endif %} poster="{{ base }}/media/{{ entry.asset_id }}/preview" src="{{ base }}/video/{{ entry.asset_id }}"></video>
     {% elif entry.live_video_id %}
     <div class="live">
       <img src="{{ base }}/media/{{ entry.asset_id }}/preview" alt="{{ entry.caption }}">

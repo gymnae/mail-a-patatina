@@ -56,6 +56,7 @@ A link posted in a WhatsApp, Signal or Telegram group is shared by everyone in i
 
 On by default; each family can switch it off on the setup page, and `KEEP_PHOTOS_ON_SERVER=false` changes the default. Nothing is attached to emails or chat messages, so there's no photo file in anyone's mailbox or chat to forward or save:
 - **Emails** load each photo from `PUBLIC_URL` through a link made for that one recipient. The link signs nobody in. It stops working after `PHOTO_LINK_DAYS` (default 30), and right away if the photo is removed from the album or loses its caption, or the recipient is removed.
+- **The pages** offer no one-tap saving: long-pressing a photo on a phone or right-clicking it doesn't bring up "Save image", videos have no download button or "Save video as…", and iOS can't lift the photo out as a sticker.
 - **Chats** get the caption and the link only. Telegram's link preview is switched off; the pages carry no preview image for WhatsApp or Signal to pick up.
 - **What it doesn't prevent:** screenshots, saving the photo while it's displayed, or copies made by mail services that fetch images through their own proxy (Gmail does, and Apple Mail's privacy protection) while the link is valid. Some mail apps block remote images until the reader taps "load images"; the caption and buttons show either way. It makes photos much harder to pass around, not impossible.
 

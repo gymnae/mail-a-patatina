@@ -191,6 +191,8 @@ def render(request: Request, template: str, viewer: Viewer | None, status: int =
         "viewer": viewer, "like": LIKE,
         "site_title": feed.cfg.title if feed else "Mail-A-Patatina",
         "base": f"/{feed.id}" if feed else "",
+        # A family that keeps its photos on the server also doesn't want them saved from the pages with one tap.
+        "protect": bool(feed and feed.cfg.keep_photos_on_server),
     }
     return templates.TemplateResponse(request, template, ctx, status_code=status)
 

@@ -54,7 +54,10 @@ figure { margin: 0; }
 .card img { border-radius: 0; }
 
 /* Live photos: the motion part lies over the still and only shows while it plays (see live.js). */
-.live { position: relative; -webkit-touch-callout: none; user-select: none; }
+.live { position: relative; -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
+/* Touches go to the box, not the image, so iOS doesn't start copying or lifting the photo on a long press. */
+.live img, .protect img { pointer-events: none; -webkit-user-drag: none; }
+.protect figure, .protect .card { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
 .live video { position: absolute; inset: 0; height: 100%; object-fit: cover; opacity: 0; transition: opacity .15s; pointer-events: none; }
 .live.playing video { opacity: 1; }
 .card .live video { border-radius: 0; }
