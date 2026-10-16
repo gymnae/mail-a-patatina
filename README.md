@@ -10,7 +10,7 @@ Add a photo to a shared Immich album and write a caption. The next morning, gran
 
 - **Immich stays in charge.** No database of its own: photos, captions, recipients, likes, comments and what was already sent all live in Immich. Back up Immich, and you've backed up the feed.
 - **Nothing new for the parents.** Share by adding a photo to the album and writing a caption in the Immich app you already use.
-- **Nothing to install for relatives.** A daily email with magic links: no app, no account to remember, no password.
+- **Nothing to install for relatives.** A daily email with magic links: no app, no account to remember, no password. In English, German, French, Finnish, Russian or Ukrainian, whichever their browser speaks.
 - **Reactions come home.** Likes and comments are real Immich activity, so you see them in your Immich app and can reply there.
 - **Photos stay on your server.** By default nothing is attached: emails and chats link to images that expire and can be revoked.
 - **Several families, one installation.** Anyone who can sign in to Immich sets up their own feed on a self-service page, kept fully apart from the others.

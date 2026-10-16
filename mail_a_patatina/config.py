@@ -14,6 +14,8 @@ from pathlib import Path
 
 import yaml
 
+from .i18n import LANGUAGES
+
 CHAT_KINDS = ("whatsapp", "signal", "telegram")
 FEED_ID = re.compile(r"^[a-z0-9][a-z0-9-]{0,31}$")
 RESERVED_IDS = {"static", "healthz", "setup"}
@@ -45,6 +47,8 @@ class Settings:
     link_days: int  # how long a magic link in an email signs someone in
     chat_link_days: int  # the same for links posted in chats
     session_days: int  # how long a browser stays signed in after opening a link, renewed on every visit
+    # Language of emails to relatives who haven't visited yet, and of group-chat messages (en, de, fr, fi, ru, uk)
+    default_language: str
     user_prefix: str
     public_url: str
     data_dir: Path
@@ -95,6 +99,7 @@ class Settings:
             link_days=int(env("LINK_DAYS", "7")),
             chat_link_days=int(env("CHAT_LINK_DAYS", "30")),
             session_days=int(env("SESSION_DAYS", "90")),
+            default_language=env("DEFAULT_LANGUAGE", "en").strip().lower(),
             user_prefix=env("USER_PREFIX", "patatina-"),
             public_url=_required("PUBLIC_URL").rstrip("/"),
             data_dir=Path(env("DATA_DIR", "/data")),
@@ -127,6 +132,8 @@ class Settings:
         )
         if len(settings.secret_key) < 32:
             raise SystemExit("SECRET_KEY must be at least 32 characters (e.g. `openssl rand -base64 48`)")
+        if settings.default_language not in LANGUAGES:
+            raise SystemExit(f"DEFAULT_LANGUAGE must be one of {', '.join(LANGUAGES)}")
         if security not in {"starttls", "ssl", "none"}:
             raise SystemExit("SMTP_SECURITY must be 'starttls', 'ssl' or 'none'")
         if bool(settings.oidc_issuer) != bool(settings.oidc_client_id):

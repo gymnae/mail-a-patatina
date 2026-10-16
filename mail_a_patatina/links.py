@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import base64
-import datetime as dt
 import hashlib
 import hmac
 import time
@@ -150,7 +149,3 @@ def clip(text: str, limit: int) -> str:
     return text if len(text) <= limit else text[: max(limit - 1, 0)].rstrip() + "…"
 
 
-def nice_date(value: str) -> str:
-    """'2026-10-12' or '2026-10-12T14:33:00' -> 'Monday, 12 October 2026'."""
-    d = dt.date.fromisoformat(value[:10])
-    return f"{d:%A}, {d.day} {d:%B %Y}"

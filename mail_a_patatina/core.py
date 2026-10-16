@@ -15,6 +15,7 @@ from . import dispatch, mailer, sync
 from apscheduler.triggers.cron import CronTrigger
 
 from .config import FeedConfig, Settings, feed_config, load_feeds
+from .i18n import Remembered
 from .immich import Immich
 from .library import Library
 from .media import MediaCache
@@ -115,6 +116,7 @@ class Core:
         self.settings = settings
         self.people = People(settings)
         self.media = MediaCache(settings.data_dir / "cache")
+        self.languages = Remembered(settings.data_dir / "languages.json")  # each relative's last browser language
         self.http = httpx.AsyncClient(timeout=120)
         self.store = FeedStore(settings.setup_dir)
         self.feeds: dict[str, Feed] = {cfg.id: Feed(self, cfg) for cfg in load_feeds(settings)}

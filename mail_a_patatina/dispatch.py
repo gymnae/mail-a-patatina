@@ -11,7 +11,8 @@ from typing import TYPE_CHECKING
 from . import mailer
 from .chats import SENDERS
 from .library import BACKLOG, Entry, ago, now
-from .links import clip, entry_url, make_token, nice_date
+from .i18n import nice_date, t
+from .links import clip, entry_url, make_token
 from .people import Member
 
 if TYPE_CHECKING:
@@ -28,20 +29,22 @@ class Target:
     address: str
     token: str  # magic-link token for its links (only valid for this feed)
     member: Member | None  # the person behind it, if it's personal
+    lang: str = "en"  # the person's language as their browser last showed it, else DEFAULT_LANGUAGE
 
 
 async def targets(feed: Feed) -> list[Target]:
     s, people = feed.core.settings, feed.core.people
+    lang = lambda member: (member and feed.core.languages.get(member.id)) or s.default_language  # noqa: E731
     out = []
     for m in feed.relatives():
         if await people.wants_email(m):
-            out.append(Target(f"user:{m.id}", "email", m.name, m.email, make_token(s, feed.id, "u", m.id), m))
+            out.append(Target(f"user:{m.id}", "email", m.name, m.email, make_token(s, feed.id, "u", m.id), m, lang(m)))
     for chat in feed.cfg.chats:
         person = feed.by_email(chat.person) if chat.person else None
         # A one-to-one chat signs in as its person, but its messages stay around as long as a group's.
         token = (make_token(s, feed.id, "u", person.id, s.chat_link_days) if person
                  else make_token(s, feed.id, "c", chat.ref))
-        out.append(Target(f"chat:{chat.key}", chat.kind, chat.name, chat.address, token, person))
+        out.append(Target(f"chat:{chat.key}", chat.kind, chat.name, chat.address, token, person, lang(person)))
     return out
 
 
@@ -64,9 +67,9 @@ def pending(feed: Feed, target: Target) -> list[Entry]:
 
 def chat_caption(feed: Feed, target: Target, entry: Entry) -> str:
     link = entry_url(feed.core.settings, feed.id, entry.asset_id, target.token)
-    tail = f"\n\n📅 {nice_date(entry.taken_at)}\n💬 {link}"
+    tail = f"\n\n📅 {nice_date(entry.taken_at, target.lang)}\n💬 {link}"
     if entry.type == "VIDEO":
-        tail = "\n▶️ Video – watch it via the link" + tail
+        tail = "\n" + t(target.lang, "▶️ Video – watch it via the link") + tail
     # Keep the link intact; Telegram captions are limited to 1024 characters.
     return clip(entry.caption, 1000 - len(tail)) + tail
 

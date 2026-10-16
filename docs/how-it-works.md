@@ -25,7 +25,7 @@ Mail-A-Patatina only **transports, presents and collects**. It has no database: 
 | Families, chats, SMTP, schedule | Configuration: `.env` and `config/feeds.yml` or `config/chats.yml` |
 | The relatives' API keys | Credentials: `./secrets/relatives.yml`, next to `.env` |
 
-`./data` only holds a cache of resized JPEGs and is safe to delete. Restarting or rebuilding the container loses nothing.
+`./data` only holds a cache of resized JPEGs and each relative's last browser language, and is safe to delete. Restarting or rebuilding the container loses nothing.
 
 ## Sharing a moment
 
@@ -64,6 +64,15 @@ On by default; each family can switch it off on the setup page, and `KEEP_PHOTOS
 - **The pages** offer no one-tap saving: long-pressing a photo on a phone or right-clicking it doesn't bring up "Save image", videos have no download button or "Save video as…", and iOS can't lift the photo out as a sticker.
 - **Chats** get the caption and the link only. Telegram's link preview is switched off; the pages carry no preview image for WhatsApp or Signal to pick up.
 - **What it doesn't prevent:** screenshots, saving the photo while it's displayed, or copies made by mail services that fetch images through their own proxy (Gmail does, and Apple Mail's privacy protection) while the link is valid. Some mail apps block remote images until the reader taps "load images"; the caption and buttons show either way. It makes photos much harder to pass around, not impossible.
+
+## Languages
+
+Everything relatives see is in English, German, French, Finnish, Russian or Ukrainian: the pages, messages, the daily email, chat captions and the invite page for connecting their own Immich account. The parents' setup page is in English.
+- **Pages** follow the visitor's browser or phone language. Other languages get `DEFAULT_LANGUAGE` (default `en`).
+- **Emails** have no browser to ask, so each relative gets them in the language their browser showed on their last visit (kept in `./data/languages.json`). Before their first visit, or if that file is lost, `DEFAULT_LANGUAGE` applies.
+- **Group-chat captions** are in `DEFAULT_LANGUAGE`; one-to-one chats tied to a relative follow that relative.
+
+Captions and comments are what the family writes and aren't translated. New texts go into `mail_a_patatina/i18n.py`; a test fails if a page uses a text that has no translation.
 
 ## Only Immich's reactions
 

@@ -7,13 +7,15 @@ import pytest
 from fastapi.testclient import TestClient
 
 from mail_a_patatina import web
+from mail_a_patatina.i18n import Remembered
 from mail_a_patatina.library import Library
 
 
 @pytest.fixture
 def settings():
     return NS(secret_key="x" * 40, link_version="1", link_days=7, chat_link_days=30, session_days=90,
-              public_url="http://testserver", secure_cookies=False, smtp_host="smtp", photo_link_days=30)
+              public_url="http://testserver", secure_cookies=False, smtp_host="smtp", photo_link_days=30,
+              default_language="en")
 
 
 @pytest.fixture
@@ -22,8 +24,9 @@ def oma():
 
 
 @pytest.fixture
-def family(settings, oma, monkeypatch):
-    """The stubbed core behind the website. `.sent` collects emails, `.saved` what the setup store saved."""
+def family(settings, oma, monkeypatch, tmp_path):
+    """The stubbed core behind the website. `.sent` collects emails, `.saved` what the setup store saved,
+    `.languages` each relative's remembered language."""
     async def no_activities():
         return []
 
@@ -37,11 +40,12 @@ def family(settings, oma, monkeypatch):
         sent.append(msg)
 
     store = NS(get=lambda feed_id: {"id": feed_id, "owner_email": "mama@example.com"}, save=saved.append)
-    monkeypatch.setattr(web, "core", NS(settings=settings, feeds={"falks": feed}, store=store,
+    languages = Remembered(tmp_path / "languages.json")
+    monkeypatch.setattr(web, "core", NS(settings=settings, feeds={"falks": feed}, store=store, languages=languages,
                                         people=NS(display_name=lambda name: name)), raising=False)
     monkeypatch.setattr(web.mailer, "send", send)
     monkeypatch.setattr(web, "RENEWED", {})
-    return NS(feed=feed, saved=saved, sent=sent)
+    return NS(feed=feed, saved=saved, sent=sent, languages=languages)
 
 
 @pytest.fixture

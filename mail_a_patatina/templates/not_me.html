@@ -1,18 +1,18 @@
 {% extends "base.html" %}
-{% block title %}Not {{ viewer.name }}? · {{ site_title }}{% endblock %}
+{% block title %}{{ _("Not {name}?", name=viewer.name) }} · {{ site_title }}{% endblock %}
 {% block main %}
 <div class="message">
-  <h1>Not {{ viewer.name }}?</h1>
-  <p>You're using {{ viewer.name }}'s link, perhaps from a forwarded email. Every ❤️ and comment here appears under {{ viewer.name }}'s name.</p>
-  <p>Ask the family for emails of your own:</p>
-  {% if error %}<p class="notice error" role="alert">{{ error }}</p>{% endif %}
+  <h1>{{ _("Not {name}?", name=viewer.name) }}</h1>
+  <p>{{ _("You're using {name}'s link, perhaps from a forwarded email. Every ❤️ and comment here appears under {name}'s name.", name=viewer.name) }}</p>
+  <p>{{ _("Ask the family for emails of your own:") }}</p>
+  {% if error %}<p class="notice error" role="alert">{{ _(error) }}</p>{% endif %}
   <form method="post" action="{{ base }}/not-me" class="comment-form">
-    <input name="name" placeholder="Your name" maxlength="60" required autocomplete="name" value="{{ name or '' }}">
-    <input name="email" type="email" placeholder="Your email" required autocomplete="email" value="{{ email or '' }}">
-    <button>Ask the family</button>
+    <input name="name" placeholder="{{ _('Your name') }}" maxlength="60" required autocomplete="name" value="{{ name or '' }}">
+    <input name="email" type="email" placeholder="{{ _('Your email') }}" required autocomplete="email" value="{{ email or '' }}">
+    <button>{{ _("Ask the family") }}</button>
   </form>
   <form method="post" action="{{ base }}/not-me">
-    <button class="link">Just sign me out</button>
+    <button class="link">{{ _("Just sign me out") }}</button>
   </form>
 </div>
 {% endblock %}

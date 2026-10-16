@@ -30,14 +30,15 @@ from . import dispatch, mailer
 from .config import CHAT_KINDS
 from .immich import CONTRIBUTOR_PERMISSIONS, KEY_NAME, OWNER_PERMISSIONS, RELATIVE_PERMISSIONS, Immich, LoginFailed
 from .library import now
-from .links import INVITE_DAYS, LIKE, invite_url, make_token, nice_date, read_invite
+from .i18n import from_header, install
+from .links import INVITE_DAYS, LIKE, invite_url, make_token, read_invite
 from .people import save_key
 from .whatsapp import Gateway, GatewayError
 
 log = logging.getLogger(__name__)
 router = APIRouter(prefix="/setup")
 templates = Jinja2Templates(directory=Path(__file__).parent / "templates")
-templates.env.filters["nice_date"] = nice_date
+install(templates.env)  # English here, except on the invite pages relatives and co-parents open
 
 COOKIE = "map_setup"
 IDLE_SECONDS = 3600
@@ -397,8 +398,14 @@ def invitation(request: Request, token: str):
     return role, raw, feed, member
 
 
-def join_message(request: Request, title: str, text: str) -> HTMLResponse:
-    return page(request, "setup/message.html", None, title=title, text=text, home=False)
+def join_language(request: Request) -> str:
+    return from_header(request.headers.get("accept-language")) or settings(request).default_language
+
+
+def join_message(request: Request, title: str, text: str, **values) -> HTMLResponse:
+    """A message on the invite pages, in the visitor's language (English text, {placeholders} from values)."""
+    return page(request, "setup/message.html", None, title=title, text=text, values=values, home=False,
+                lang=join_language(request))
 
 
 @router.get("/join/{token}", response_class=HTMLResponse)
@@ -407,7 +414,8 @@ async def join_page(request: Request, token: str):
     if invite is None or not await immich_oauth(request):
         return join_message(request, "This link doesn't work anymore", "Ask the family for a new one.")
     role, raw, _, member = invite
-    return page(request, "setup/join.html", None, raw=raw, member=member, role=role, token=token)
+    return page(request, "setup/join.html", None, raw=raw, member=member, role=role, token=token,
+                lang=join_language(request))
 
 
 @router.post("/join/{token}")
@@ -450,7 +458,8 @@ async def finish_join(request: Request, token: str, nonce: str, state: str, veri
         me = await immich.me()
         if me["id"] != member.id:
             return join_message(request, "Wrong account",
-                                f"This link is for {member.name} ({member.email}), but you signed in to Immich as {me['email']}.")
+                                "This link is for {name} ({email}), but you signed in to Immich as {other}.",
+                                name=member.name, email=member.email, other=me["email"])
         key = await immich.create_api_key(KEY_NAME, CONTRIBUTOR_PERMISSIONS if role == "coparent" else RELATIVE_PERMISSIONS)
         old = contributor_keys(feed).get(member.id) if role == "coparent" else c.people.keys.get(member.email)
         if old:
@@ -464,13 +473,13 @@ async def finish_join(request: Request, token: str, nonce: str, state: str, veri
         raw["contributor_keys"] = list(keys.values())
         c.store.save(raw)
         await c.apply_stored(raw["id"])
-        text = (f"Photos you add to the album “{raw['title']}” are shared with the family now"
-                + (", once you've written a description." if raw.get("require_caption", True) else "."))
+        text = ("Photos you add to the album “{title}” are shared with the family now, once you've written a description."
+                if raw.get("require_caption", True) else "Photos you add to the album “{title}” are shared with the family now.")
     else:
         save_key(s.keys_file, member.email, key)
         await c.people.reload_keys()
-        text = f"You'll get “{raw['title']}” by email, and can like and comment on every photo."
-    response = join_message(request, f"Thanks, {member.name}!", text)
+        text = "You'll get “{title}” by email, and can like and comment on every photo."
+    response = join_message(request, "Thanks, {name}!", text, name=member.name, title=raw["title"])
     response.delete_cookie(JOIN_COOKIE, path="/setup")
     return response
 

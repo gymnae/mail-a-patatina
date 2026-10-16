@@ -1,13 +1,13 @@
 {% extends "base.html" %}
-{% block title %}{{ month.strftime("%B %Y") }} · {{ site_title }}{% endblock %}
+{% block title %}{{ month | month_year }} · {{ site_title }}{% endblock %}
 {% block main %}
 <nav class="pager month-nav">
   <a href="{{ base }}/calendar?m={{ prev_month }}">←</a>
-  <h1>{{ month.strftime("%B %Y") }}</h1>
+  <h1>{{ month | month_year }}</h1>
   <a href="{{ base }}/calendar?m={{ next_month }}">→</a>
 </nav>
 <div class="calendar">
-  {% for name in ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] %}<div class="dow">{{ name }}</div>{% endfor %}
+  {% for name in weekdays() %}<div class="dow">{{ name }}</div>{% endfor %}
   {% for week in weeks %}{% for day in week %}
     {% set items = by_day.get(day.isoformat(), []) %}
     {% if day.month != month.month %}

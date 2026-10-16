@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="{{ lang }}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -13,32 +13,32 @@
   <tr><td style="padding:0 4px 18px;">
     <table role="presentation" cellspacing="0" cellpadding="0"><tr>
       <td style="padding-right:12px;"><img src="cid:{{ logo_cid }}" width="60" height="60" alt="" style="display:block;border:0;"></td>
-      <td style="font-size:20px;font-weight:700;color:#5a3a1c;">{{ title }}<div style="font-size:15px;font-weight:400;color:#7a6f66;padding-top:2px;">Good morning, {{ target.name }} 👋</div></td>
+      <td style="font-size:20px;font-weight:700;color:#5a3a1c;">{{ title }}<div style="font-size:15px;font-weight:400;color:#7a6f66;padding-top:2px;">{{ _("Good morning, {name} 👋", name=target.name) }}</div></td>
     </tr></table>
   </td></tr>
   {% for e in entries %}
   <tr><td style="padding-bottom:24px;">
     <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#ffffff;border-radius:14px;overflow:hidden;">
       <tr><td>
-        <a href="{{ entry_url(e) }}"><img src="{{ img_src(e) }}" width="600" alt="{{ e.caption or 'Photo' }}" style="display:block;width:100%;height:auto;border:0;"></a>
+        <a href="{{ entry_url(e) }}"><img src="{{ img_src(e) }}" width="600" alt="{{ e.caption or _('Photo') }}" style="display:block;width:100%;height:auto;border:0;"></a>
       </td></tr>
       <tr><td style="padding:16px 20px 4px;font-size:13px;color:#7a6f66;">
-        {{ e.taken_at | nice_date }}{% if e.type == "VIDEO" %} · ▶️ <a href="{{ entry_url(e) }}" style="color:#7a6f66;">watch the video</a>{% endif %}
+        {{ e.taken_at | nice_date }}{% if e.type == "VIDEO" %} · ▶️ <a href="{{ entry_url(e) }}" style="color:#7a6f66;">{{ _("watch the video") }}</a>{% endif %}
       </td></tr>
       {% if e.caption %}
       <tr><td style="padding:4px 20px 8px;font-size:18px;line-height:1.45;white-space:pre-line;">{{ e.caption }}</td></tr>
       {% endif %}
       <tr><td style="padding:8px 14px 18px;">
         <a href="{{ entry_url(e, True) }}" style="display:inline-block;margin:4px;padding:8px 14px;border-radius:999px;background:#f4f1ec;font-size:20px;text-decoration:none;">{{ like }}</a>
-        <a href="{{ entry_url(e) }}#comments" style="display:inline-block;margin:4px;padding:10px 16px;border-radius:999px;background:#2b2622;color:#ffffff;font-size:15px;text-decoration:none;">💬 Comment</a>
+        <a href="{{ entry_url(e) }}#comments" style="display:inline-block;margin:4px;padding:10px 16px;border-radius:999px;background:#2b2622;color:#ffffff;font-size:15px;text-decoration:none;">💬 {{ _("Comment") }}</a>
       </td></tr>
     </table>
   </td></tr>
   {% endfor %}
   <tr><td align="center" style="padding:8px 4px 0;font-size:13px;color:#7a6f66;line-height:1.6;">
-    <a href="{{ feed_url }}" style="color:#7a6f66;">See all moments and the calendar</a><br>
-    These links sign you in as {{ target.name }} for {{ link_days }} days, so please don't forward this email.<br>
-    <a href="{{ unsubscribe_url }}" style="color:#a39a91;">Unsubscribe</a>
+    <a href="{{ feed_url }}" style="color:#7a6f66;">{{ _("See all moments and the calendar") }}</a><br>
+    {{ _("These links sign you in as {name} for {days} days, so please don't forward this email.", name=target.name, days=link_days) }}<br>
+    <a href="{{ unsubscribe_url }}" style="color:#a39a91;">{{ _("Unsubscribe") }}</a>
   </td></tr>
 </table>
 </td></tr>

@@ -1,11 +1,11 @@
-Good morning, {{ target.name }}!
+{{ _("Good morning, {name}!", name=target.name) }}
 {% for e in entries %}
 
-{{ e.taken_at | nice_date }}{% if e.type == "VIDEO" %} (video){% endif %}
+{{ e.taken_at | nice_date }}{% if e.type == "VIDEO" %} {{ _("(video)") }}{% endif %}
 {{ e.caption }}
-React or comment: {{ entry_url(e) }}
+{{ _("React or comment:") }} {{ entry_url(e) }}
 {% endfor %}
 
-See all moments: {{ feed_url }}
-These links sign you in as {{ target.name }} for {{ link_days }} days, so please don't forward this email.
-Unsubscribe: {{ unsubscribe_url }}
+{{ _("See all moments:") }} {{ feed_url }}
+{{ _("These links sign you in as {name} for {days} days, so please don't forward this email.", name=target.name, days=link_days) }}
+{{ _("Unsubscribe:") }} {{ unsubscribe_url }}

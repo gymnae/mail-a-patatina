@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}{{ entry.caption or "A moment" }} · {{ site_title }}{% endblock %}
+{% block title %}{{ entry.caption or _("A moment") }} · {{ site_title }}{% endblock %}
 {% block main %}
 <article class="moment">
   <figure>
@@ -35,7 +35,7 @@
       <div class="comment-head">
         <strong>{{ c.name }}</strong>
         {% if c.mine %}
-        <form method="post" action="{{ base }}/comments/{{ c.id }}/delete" class="inline"><button class="link">delete</button></form>
+        <form method="post" action="{{ base }}/comments/{{ c.id }}/delete" class="inline"><button class="link">{{ _("delete") }}</button></form>
         {% endif %}
       </div>
       <p>{{ c.body }}</p>
@@ -45,18 +45,18 @@
     {% if can_post %}
     <form method="post" action="{{ base }}/e/{{ entry.asset_id }}/comment" class="comment-form">
       {% if viewer.needs_name %}
-      <input name="name" placeholder="Your name" maxlength="60" required autocomplete="name">
+      <input name="name" placeholder="{{ _('Your name') }}" maxlength="60" required autocomplete="name">
       {% endif %}
-      {% if not viewer.is_guest %}<p class="hint">Commenting as <b>{{ viewer.name }}</b></p>{% endif %}
-      <textarea name="body" rows="2" placeholder="Write something nice{% if viewer.name %}, {{ viewer.name }}{% endif %}…" maxlength="2000" required></textarea>
-      <button>Send</button>
+      {% if not viewer.is_guest %}<p class="hint">{{ _("Commenting as") }} <b>{{ viewer.name }}</b></p>{% endif %}
+      <textarea name="body" rows="2" placeholder="{{ _('Write something nice, {name}…', name=viewer.name) if viewer.name else _('Write something nice…') }}" maxlength="2000" required></textarea>
+      <button>{{ _("Send") }}</button>
     </form>
     {% endif %}
   </section>
 
   <nav class="pager">
-    {% if newer %}<a href="{{ base }}/e/{{ newer.asset_id }}">← Newer</a>{% else %}<span></span>{% endif %}
-    {% if older %}<a href="{{ base }}/e/{{ older.asset_id }}">Older →</a>{% endif %}
+    {% if newer %}<a href="{{ base }}/e/{{ newer.asset_id }}">← {{ _("Newer") }}</a>{% else %}<span></span>{% endif %}
+    {% if older %}<a href="{{ base }}/e/{{ older.asset_id }}">{{ _("Older") }} →</a>{% endif %}
   </nav>
 </article>
 

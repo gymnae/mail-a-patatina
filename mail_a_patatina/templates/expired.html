@@ -1,17 +1,19 @@
 {% extends "base.html" %}
-{% block title %}Link expired · {{ site_title }}{% endblock %}
+{% block title %}{{ _("Link expired") }} · {{ site_title }}{% endblock %}
 {% block main %}
 <div class="message">
-  <h1>This link has expired</h1>
+  <h1>{{ _("This link has expired") }}</h1>
   {% if person %}
-  <p>Links in the emails work for {{ link_days }} days, so a forwarded email can't be used for long.</p>
+  <p>{{ _("Links in the emails work for {days} days, so a forwarded email can't be used for long.", days=link_days) }}</p>
   <form method="post" action="{{ base }}/renew">
     <input type="hidden" name="t" value="{{ token }}"><input type="hidden" name="next" value="{{ next }}">
-    <button>Email me a new link</button>
+    <button>{{ _("Email me a new link") }}</button>
   </form>
-  <p class="hint">It goes to {{ masked }}, the address the family added for {{ person.name }}.</p>
+  <p class="hint">{{ _("It goes to {address}, the address the family added for {name}.", address=masked, name=person.name) }}</p>
+  {% elif chat %}
+  <p>{{ _("Open a newer moment from {chat} for a fresh link.", chat=chat.name) }}</p>
   {% else %}
-  <p>Open a newer moment from {{ chat.name if chat else "your family chat" }} for a fresh link.</p>
+  <p>{{ _("Open a newer moment from your family chat for a fresh link.") }}</p>
   {% endif %}
 </div>
 {% endblock %}

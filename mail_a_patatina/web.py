@@ -27,9 +27,11 @@ from starlette.background import BackgroundTask
 from . import mailer
 from .config import ChatSpec, Settings
 from .core import Core, Feed
+from .i18n import from_header, install
+from .i18n import t as translate  # `t` is the magic-link parameter here
 from .immich import LoginFailed
 from .library import Entry, now
-from .links import LIKE, make_session, make_token, nice_date, read_photo_ticket, read_session, read_token
+from .links import LIKE, make_session, make_token, read_photo_ticket, read_session, read_token
 from .people import Member
 from .setup import EMAIL
 from .setup import router as setup_router
@@ -78,7 +80,7 @@ app = FastAPI(lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None
 app.mount("/static", StaticFiles(directory=HERE / "static"), name="static")
 app.include_router(setup_router)  # before the /{feed_id} routes, so /setup is never taken for a feed
 templates = Jinja2Templates(directory=HERE / "templates")
-templates.env.filters["nice_date"] = nice_date
+install(templates.env)
 
 
 # --- which feed, and who is looking ------------------------------------------
@@ -233,9 +235,18 @@ async def immich_unavailable(request: Request, exc):
     return message_page(request, "Back in a moment", "The photo library is not reachable right now.", 502)
 
 
+def language(request: Request, viewer: Viewer | None = None) -> str:
+    """The visitor's browser language. A relative's is remembered, so their emails can be in it too."""
+    lang = from_header(request.headers.get("accept-language"))
+    if lang and viewer is not None and viewer.account is not None and not viewer.is_guest:
+        core.languages.remember(viewer.account.id, lang)
+    return lang or core.settings.default_language
+
+
 def render(request: Request, template: str, viewer: Viewer | None, status: int = 200, **ctx) -> HTMLResponse:
     feed = viewer.feed if viewer else ctx.pop("feed", None)
     ctx |= {
+        "lang": language(request, viewer),
         "viewer": viewer, "like": LIKE,
         "site_title": feed.cfg.title if feed else "Mail-A-Patatina",
         "base": f"/{feed.id}" if feed else "",
@@ -245,8 +256,10 @@ def render(request: Request, template: str, viewer: Viewer | None, status: int =
     return templates.TemplateResponse(request, template, ctx, status_code=status)
 
 
-def message_page(request: Request, title: str, text: str, status: int = 200) -> HTMLResponse:
-    return render(request, "message.html", None, status, title=title, text=text)
+def message_page(request: Request, title: str, text: str, status: int = 200, feed: Feed | None = None,
+                 **values) -> HTMLResponse:
+    """A page with a title and a line of text, both translated (English text, with {placeholders} from values)."""
+    return render(request, "message.html", None, status, feed=feed, title=title, text=text, values=values)
 
 
 def shared_entry(feed: Feed, asset_id: str) -> Entry:
@@ -475,8 +488,8 @@ async def unsubscribe_confirm(request: Request, feed_id: str, t: str = ""):
 async def unsubscribe(request: Request, feed_id: str, t: str = ""):
     feed, member = _member_for_unsubscribe(feed_id, t)
     await core.people.run_as(member, lambda c: c.update_preferences({"emailNotifications": {"enabled": False}}))
-    return render(request, "message.html", None, feed=feed, title="Unsubscribed",
-                  text="You won't get these emails anymore. Your links still open the album.")
+    return message_page(request, "Unsubscribed", "You won't get these emails anymore. Your links still open the album.",
+                        feed=feed)
 
 
 # --- expired links and "Not you?" ---------------------------------------------
@@ -499,18 +512,21 @@ async def renew(request: Request, feed_id: str, t: str = Form(), next: str = For
         RENEWED[member.id] = time.monotonic()
         path = next if next.startswith(f"/{feed.id}/") and "//" not in next and "\\" not in next else f"/{feed.id}/"
         link = f"{core.settings.public_url}{path}?{urlencode({'t': make_token(core.settings, feed.id, 'u', member.id)})}"
-        body = (f"Hello {member.name},\n\nhere is your new link to {feed.cfg.title}:\n\n{link}\n\n"
-                f"It signs you in and works for {core.settings.link_days} days, so please don't forward it.\n"
-                "If you didn't ask for it, you can ignore this email: nobody else got this link.")
+        # Whoever pressed the button may not be the owner, so their remembered language comes first.
+        lang = core.languages.get(member.id) or language(request)
+        body = translate(lang, "Hello {name},\n\nhere is your new link to {title}:\n\n{link}\n\n"
+                               "It signs you in and works for {days} days, so please don't forward it.\n"
+                               "If you didn't ask for it, you can ignore this email: nobody else got this link.",
+                         name=member.name, title=feed.cfg.title, link=link, days=core.settings.link_days)
         try:
-            await mailer.send(core.settings, mailer.build_simple(feed.cfg.smtp_from, [member.email],
-                                                                 f"{feed.cfg.title}: your new link", body))
+            await mailer.send(core.settings, mailer.build_simple(
+                feed.cfg.smtp_from, [member.email], translate(lang, "{title}: your new link", title=feed.cfg.title), body))
         except Exception:
             log.exception("Could not email a fresh link for feed %s", feed.id)
             RENEWED.pop(member.id, None)
             return message_page(request, "Can't send email right now", "Try again in a while.", 503)
-    return render(request, "message.html", None, feed=feed, title="Check your email",
-                  text=f"A new link is on its way to {_masked(found[0])}.")
+    return message_page(request, "Check your email", "A new link is on its way to {address}.", feed=feed,
+                        address=_masked(found[0]))
 
 
 @app.get("/{feed_id}/not-me", response_class=HTMLResponse)
@@ -530,8 +546,8 @@ async def not_me(request: Request, background: BackgroundTasks, feed_id: str, na
         raise HTTPException(404)
     feed = viewer.feed
     name, email = name.strip()[:60], email.strip().lower()
-    response = render(request, "message.html", None, feed=feed, title="Signed out",
-                      text="You're no longer signed in as someone else on this device.")
+    response = message_page(request, "Signed out", "You're no longer signed in as someone else on this device.",
+                            feed=feed)
     response.delete_cookie(TOKEN_COOKIE, path=f"/{feed.id}")
     if not name and not email:  # only signing out
         return response
@@ -539,8 +555,8 @@ async def not_me(request: Request, background: BackgroundTasks, feed_id: str, na
         return render(request, "not_me.html", viewer, error="Enter your name and a valid email address.",
                       name=name, email=email)
     if feed.by_email(email):
-        response = render(request, "message.html", None, feed=feed, title="You're already in",
-                          text="You get your own emails already. Use the links in those.")
+        response = message_page(request, "You're already in", "You get your own emails already. Use the links in those.",
+                                feed=feed)
         response.delete_cookie(TOKEN_COOKIE, path=f"/{feed.id}")
         return response
     raw = core.store.get(feed.id)
@@ -556,8 +572,9 @@ async def not_me(request: Request, background: BackgroundTasks, feed_id: str, na
     else:
         background.add_task(feed.notify_admins, f"{feed.cfg.title}: {name} asks to join",
                             f"{request_text}\n\nTo add them: add-relative --feed {feed.id} \"{name}\" {email}")
-    response = render(request, "message.html", None, feed=feed, title="Thanks, the family is told",
-                      text="Once they've added you, you get your own emails. Until then you're signed out here.")
+    response = message_page(request, "Thanks, the family is told",
+                            "Once they've added you, you get your own emails. Until then you're signed out here.",
+                            feed=feed)
     response.delete_cookie(TOKEN_COOKIE, path=f"/{feed.id}")
     return response
 

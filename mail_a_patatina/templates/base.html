@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="{{ lang or 'en' }}">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -16,11 +16,11 @@
   <header class="top">
     <a class="brand" href="{{ base }}/"><img src="/static/favicon.svg" alt="" width="36" height="36">{{ site_title }}</a>
     {% block nav %}{% if viewer %}
-    <nav><a href="{{ base }}/">Feed</a><a href="{{ base }}/calendar">Calendar</a></nav>
+    <nav><a href="{{ base }}/">{{ _("Feed") }}</a><a href="{{ base }}/calendar">{{ _("Calendar") }}</a></nav>
     {% endif %}{% endblock %}
   </header>
   {% if viewer and viewer.account and not viewer.is_guest %}
-  <p class="whoami">Signed in as <b>{{ viewer.name }}</b> · <a href="{{ base }}/not-me">Not {{ viewer.name }}?</a></p>
+  <p class="whoami">{{ _("Signed in as") }} <b>{{ viewer.name }}</b> · <a href="{{ base }}/not-me">{{ _("Not {name}?", name=viewer.name) }}</a></p>
   {% endif %}
   <main>{% block main %}{% endblock %}</main>
 </body>

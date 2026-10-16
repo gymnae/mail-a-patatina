@@ -12,13 +12,13 @@
   <img src="{{ base }}/media/{{ e.asset_id }}/preview" alt="{{ e.caption }}" loading="lazy">
   {% endif %}
   <div class="card-body">
-    <p class="date">{{ e.taken_at | nice_date }}{% if e.type == "VIDEO" %} · ▶️ video{% endif %}</p>
+    <p class="date">{{ e.taken_at | nice_date }}{% if e.type == "VIDEO" %} · ▶️ {{ _("video") }}{% endif %}</p>
     {% if e.caption %}<p class="caption">{{ e.caption }}</p>{% endif %}
     <p class="counts"><span>{{ like }} {{ a.likes | length }}</span><span>💬 {{ a.comments | length }}</span></p>
   </div>
 </a>
 {% else %}
-<p class="empty">Nothing shared yet.</p>
+<p class="empty">{{ _("Nothing shared yet.") }}</p>
 {% endfor %}
-{% if older %}<nav class="pager"><span></span><a href="{{ base }}/?before={{ older }}">Older →</a></nav>{% endif %}
+{% if older %}<nav class="pager"><span></span><a href="{{ base }}/?before={{ older }}">{{ _("Older") }} →</a></nav>{% endif %}
 {% endblock %}

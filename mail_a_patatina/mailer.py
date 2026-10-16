@@ -15,7 +15,8 @@ from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 from .config import FeedConfig, Settings
 from .library import Entry
-from .links import LIKE, entry_url, feed_url, nice_date, photo_url, unsubscribe_url
+from .i18n import install, t
+from .links import LIKE, entry_url, feed_url, photo_url, unsubscribe_url
 
 if TYPE_CHECKING:
     from .dispatch import Target
@@ -24,19 +25,21 @@ _env = Environment(
     loader=FileSystemLoader(Path(__file__).parent / "templates"),
     autoescape=select_autoescape(["html"]),
 )
-_env.filters["nice_date"] = nice_date
+install(_env)
 LOGO = (Path(__file__).parent / "static" / "logo-email.png").read_bytes()
 
 
 def build_digest(
     s: Settings, feed: FeedConfig, target: Target, entries: list[Entry], images: dict[str, bytes]
 ) -> EmailMessage:
-    first = entries[0].caption or "A new moment"
-    subject = first if len(entries) == 1 else f"{first} (+{len(entries) - 1} more)"
+    lang = target.lang
+    first = entries[0].caption or t(lang, "A new moment")
+    subject = first if len(entries) == 1 else t(lang, "{first} (+{n} more)", first=first, n=len(entries) - 1)
     domain = parseaddr(feed.smtp_from)[1].rpartition("@")[2] or None
     cids = {asset_id: make_msgid(domain=domain) for asset_id in images}  # empty if photos stay on the server
     logo_cid = make_msgid(domain=domain)
     ctx = {
+        "lang": lang,
         "title": feed.title,
         "target": target,
         "entries": entries,
@@ -51,7 +54,7 @@ def build_digest(
     }
 
     msg = EmailMessage()
-    msg["Subject"] = f"{feed.title}: {textwrap.shorten(subject, 90, placeholder='…')}"
+    msg["Subject"] = t(lang, "{title}: {subject}", title=feed.title, subject=textwrap.shorten(subject, 90, placeholder="…"))
     msg["From"] = feed.smtp_from
     msg["To"] = target.address
     msg["Date"] = formatdate(localtime=True)
@@ -64,6 +67,7 @@ def build_digest(
     html_part.add_related(LOGO, "image", "png", cid=logo_cid, filename="mail-a-patatina.png")
     for asset_id, cid in cids.items():
         html_part.add_related(images[asset_id], "image", "jpeg", cid=cid, filename=f"{asset_id[:8]}.jpg")
+    msg["Content-Language"] = lang  # last: set_content() drops Content-* headers
     return msg
 
 
