@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Link expired · {{ site_title }}{% endblock %}
+{% block main %}
+<div class="message">
+  <h1>This link has expired</h1>
+  {% if person %}
+  <p>Links in the emails work for {{ link_days }} days, so a forwarded email can't be used for long.</p>
+  <form method="post" action="{{ base }}/renew">
+    <input type="hidden" name="t" value="{{ token }}"><input type="hidden" name="next" value="{{ next }}">
+    <button>Email me a new link</button>
+  </form>
+  <p class="hint">It goes to {{ masked }}, the address the family added for {{ person.name }}.</p>
+  {% else %}
+  <p>Open a newer moment from {{ chat.name if chat else "your family chat" }} for a fresh link.</p>
+  {% endif %}
+</div>
+{% endblock %}

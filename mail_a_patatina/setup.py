@@ -916,7 +916,32 @@ async def whatsapp_unlink(request: Request, feed_id: str, csrf: str = Form()):
 @router.post("/f/{feed_id}/relatives/add")
 async def add_relative(request: Request, feed_id: str, csrf: str = Form(), name: str = Form(), email: str = Form()):
     session = require(request, csrf)
+    return await add_person(request, owned(request, session, feed_id), feed_id, name, email)
+
+
+@router.post("/f/{feed_id}/requests/accept")
+async def accept_request(request: Request, feed_id: str, csrf: str = Form(), email: str = Form()):
+    """Someone who opened a relative's link asked for emails of their own ("Not you?" on the pages)."""
+    session = require(request, csrf)
     raw = owned(request, session, feed_id)
+    wanted = next((r for r in raw.get("join_requests", []) if r["email"] == email), None)
+    if wanted is None:
+        return back(feed_id)
+    raw["join_requests"] = [r for r in raw["join_requests"] if r["email"] != email]
+    core(request).store.save(raw)
+    return await add_person(request, raw, feed_id, wanted["name"], wanted["email"])
+
+
+@router.post("/f/{feed_id}/requests/decline")
+async def decline_request(request: Request, feed_id: str, csrf: str = Form(), email: str = Form()):
+    session = require(request, csrf)
+    raw = owned(request, session, feed_id)
+    raw["join_requests"] = [r for r in raw.get("join_requests", []) if r["email"] != email]
+    core(request).store.save(raw)
+    return back(feed_id, msg="Request declined.")
+
+
+async def add_person(request: Request, raw: dict, feed_id: str, name: str, email: str) -> Response:
     email, name = email.strip().lower(), name.strip()[:60]
     if not name or not EMAIL.match(email):
         return back(feed_id, error="Enter a name and a valid email address.")

@@ -10,6 +10,7 @@ import calendar
 import datetime as dt
 import logging
 import re
+import time
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from pathlib import Path
@@ -23,12 +24,14 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.background import BackgroundTask
 
+from . import mailer
 from .config import ChatSpec, Settings
 from .core import Core, Feed
 from .immich import LoginFailed
-from .library import Entry
-from .links import LIKE, make_token, nice_date, read_photo_ticket, read_token
+from .library import Entry, now
+from .links import LIKE, make_session, make_token, nice_date, read_photo_ticket, read_session, read_token
 from .people import Member
+from .setup import EMAIL
 from .setup import router as setup_router
 
 log = logging.getLogger(__name__)
@@ -36,7 +39,9 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name
 
 HERE = Path(__file__).parent
 TOKEN_COOKIE, GUEST_NAME_COOKIE = "map_t", "map_n"
-COOKIE_AGE = 400 * 24 * 3600
+COOKIE_AGE = 400 * 24 * 3600  # the guest-name cookie; the sign-in cookie lives SESSION_DAYS
+RENEW_SECONDS = 600  # a fresh link is emailed to the same person at most this often
+JOIN_REQUESTS_MAX = 20  # open "Not you?" requests per family
 PAGE_SIZE = 20
 GUEST_COMMENT = re.compile(r"^\[(?P<name>[^\]\n]{1,60})\] (?P<body>.*)$", re.S)
 
@@ -108,13 +113,8 @@ class Viewer:
         return self.is_guest and not self.guest_name
 
 
-def viewer_for_token(feed: Feed, token: str | None, request: Request | None = None) -> Viewer | None:
-    parsed = read_token(core.settings, token) if token else None
-    if parsed is None:
-        return None
-    feed_id, kind, ident = parsed
-    if feed_id != feed.id:  # a genuine link, but for another family
-        return None
+def viewer_for(feed: Feed, kind: str, ident: str, request: Request | None = None) -> Viewer | None:
+    """Who a link or sign-in cookie stands for, as long as they're still part of the album."""
     if kind == "u":
         member = feed.members.get(ident)  # removed from the album in Immich = link stops working
         if member is None or member.email == feed.cfg.bot_email:
@@ -127,8 +127,24 @@ def viewer_for_token(feed: Feed, token: str | None, request: Request | None = No
     return Viewer(feed, feed.bot, chat, name or None)
 
 
+def link_viewer(feed: Feed, token: str | None) -> tuple[Viewer, bool] | None:
+    """-> (who a magic link stands for, whether it has expired), or None if it isn't a genuine link of this feed."""
+    link = read_token(core.settings, token) if token else None
+    if link is None or link.feed_id != feed.id:  # forged, or a genuine link for another family
+        return None
+    viewer = viewer_for(feed, link.kind, link.ident)
+    return (viewer, link.expired) if viewer else None
+
+
+def viewer_for_session(feed: Feed, request: Request) -> Viewer | None:
+    session = read_session(core.settings, request.cookies.get(TOKEN_COOKIE) or "")
+    if session is None or session.feed_id != feed.id:
+        return None
+    return viewer_for(feed, session.kind, session.ident, request)
+
+
 def require_viewer(request: Request, feed_id: str) -> Viewer:
-    viewer = viewer_for_token(get_feed(feed_id), request.cookies.get(TOKEN_COOKIE), request)
+    viewer = viewer_for_session(get_feed(feed_id), request)
     if viewer is None:
         raise HTTPException(403)
     return viewer
@@ -141,25 +157,57 @@ def set_cookie(response: Response, feed: Feed, name: str, value: str) -> None:
     )
 
 
+def sign_in(response: Response, feed: Feed, viewer: Viewer) -> None:
+    kind, ident = ("c", viewer.chat.ref) if viewer.is_guest else ("u", viewer.account.id)
+    response.set_cookie(
+        TOKEN_COOKIE, make_session(core.settings, feed.id, kind, ident), max_age=core.settings.session_days * 86400,
+        path=f"/{feed.id}", httponly=True, samesite="lax", secure=core.settings.secure_cookies,
+    )
+
+
 @app.middleware("http")
 async def magic_link(request: Request, call_next):
     """`?t=<token>` on any page signs the visitor in, then redirects to the same URL without the token,
-    so a link copied from the address bar never carries someone's identity."""
+    so a link copied from the address bar never carries someone's identity. An expired link signs nobody in;
+    it offers to email its owner a fresh one instead."""
     token = request.query_params.get("t")
     parts = request.url.path.strip("/").split("/")
-    if not token or request.method != "GET" or (len(parts) > 1 and parts[1] == "unsubscribe"):
-        return await call_next(request)
     feed = core.feeds.get(parts[0])
-    new = viewer_for_token(feed, token) if feed else None
-    if new is None:
+    if feed is None or request.method != "GET" or (len(parts) > 1 and parts[1] == "unsubscribe"):
+        return await call_next(request)
+    if not token:
+        response = await call_next(request)
+        # Keep a browser that keeps visiting signed in: renew its cookie at most once a day.
+        session = read_session(core.settings, request.cookies.get(TOKEN_COOKIE) or "")
+        if (session and session.feed_id == feed.id and session.expires < time.time() + (core.settings.session_days - 1) * 86400
+                and (viewer := viewer_for_session(feed, request))):
+            sign_in(response, feed, viewer)
+        return response
+    found = link_viewer(feed, token)
+    if found is None:
         return message_page(request, "This link is no longer valid", "Ask the family for a fresh one.", 403)
+    new, expired = found
     params = {k: v for k, v in request.query_params.items() if k != "t"}
-    response = RedirectResponse(request.url.path + (f"?{urlencode(params)}" if params else ""), status_code=303)
-    current = viewer_for_token(feed, request.cookies.get(TOKEN_COOKIE), request)
+    target = request.url.path + (f"?{urlencode(params)}" if params else "")
+    current = viewer_for_session(feed, request)
     # Keep a personal identity when the same person also opens a group-chat link.
-    if current is None or not new.is_guest or current.is_guest:
-        set_cookie(response, feed, TOKEN_COOKIE, token)
+    keep_current = current is not None and (new.is_guest or not current.is_guest)
+    if expired and not keep_current:
+        return render(request, "expired.html", None, 403, feed=feed, person=new.account if not new.is_guest else None,
+                      chat=new.chat, token=token, next=request.url.path, masked=_masked(new),
+                      link_days=core.settings.link_days)
+    response = RedirectResponse(target, status_code=303)
+    if not expired and not (keep_current and new.is_guest):
+        sign_in(response, feed, new)
     return response
+
+
+def _masked(viewer: Viewer) -> str:
+    """o***@example.com: enough for the right person to recognise their address, little for anyone else."""
+    if viewer.is_guest or not viewer.account.email:
+        return ""
+    local, _, domain = viewer.account.email.partition("@")
+    return f"{local[:1]}***@{domain}"
 
 
 @app.exception_handler(403)
@@ -381,7 +429,7 @@ async def emailed_photo(feed_id: str, asset_id: str, ticket: str):
     ticket is genuine and not expired, its recipient is still in the album, the photo is still shared."""
     feed = get_feed(feed_id)
     recipient = read_photo_ticket(core.settings, feed.id, asset_id, ticket)
-    if recipient is None or viewer_for_token(feed, make_token(core.settings, feed.id, *recipient)) is None:
+    if recipient is None or viewer_for(feed, *recipient) is None:
         raise HTTPException(404)
     shared_entry(feed, asset_id)
     data = await core.media.jpeg(feed.curator, asset_id, "preview")
@@ -411,10 +459,10 @@ async def video(request: Request, feed_id: str, asset_id: str):
 
 def _member_for_unsubscribe(feed_id: str, token: str) -> tuple[Feed, Member]:
     feed = get_feed(feed_id)
-    viewer = viewer_for_token(feed, token)
-    if viewer is None or viewer.is_guest:
+    found = link_viewer(feed, token)  # unsubscribing works with expired links too
+    if found is None or found[0].is_guest:
         raise HTTPException(404)
-    return feed, viewer.account
+    return feed, found[0].account
 
 
 @app.get("/{feed_id}/unsubscribe", response_class=HTMLResponse)
@@ -429,3 +477,96 @@ async def unsubscribe(request: Request, feed_id: str, t: str = ""):
     await core.people.run_as(member, lambda c: c.update_preferences({"emailNotifications": {"enabled": False}}))
     return render(request, "message.html", None, feed=feed, title="Unsubscribed",
                   text="You won't get these emails anymore. Your links still open the album.")
+
+
+# --- expired links and "Not you?" ---------------------------------------------
+
+RENEWED: dict[str, float] = {}  # member id -> when they were last emailed a fresh link
+
+
+@app.post("/{feed_id}/renew", response_class=HTMLResponse)
+async def renew(request: Request, feed_id: str, t: str = Form(), next: str = Form("")):
+    """Emails a fresh link for an expired one, only ever to the address of the person it belonged to.
+    Someone a forwarded email reached gets nothing out of it."""
+    feed = get_feed(feed_id)
+    found = link_viewer(feed, t)
+    if found is None or found[0].is_guest:
+        raise HTTPException(404)
+    member = found[0].account
+    if not core.settings.smtp_host or not member.email:
+        return message_page(request, "Can't send email", "Ask the family for a fresh link.", 503)
+    if time.monotonic() - RENEWED.get(member.id, float("-inf")) >= RENEW_SECONDS:
+        RENEWED[member.id] = time.monotonic()
+        path = next if next.startswith(f"/{feed.id}/") and "//" not in next and "\\" not in next else f"/{feed.id}/"
+        link = f"{core.settings.public_url}{path}?{urlencode({'t': make_token(core.settings, feed.id, 'u', member.id)})}"
+        body = (f"Hello {member.name},\n\nhere is your new link to {feed.cfg.title}:\n\n{link}\n\n"
+                f"It signs you in and works for {core.settings.link_days} days, so please don't forward it.\n"
+                "If you didn't ask for it, you can ignore this email: nobody else got this link.")
+        try:
+            await mailer.send(core.settings, mailer.build_simple(feed.cfg.smtp_from, [member.email],
+                                                                 f"{feed.cfg.title}: your new link", body))
+        except Exception:
+            log.exception("Could not email a fresh link for feed %s", feed.id)
+            RENEWED.pop(member.id, None)
+            return message_page(request, "Can't send email right now", "Try again in a while.", 503)
+    return render(request, "message.html", None, feed=feed, title="Check your email",
+                  text=f"A new link is on its way to {_masked(found[0])}.")
+
+
+@app.get("/{feed_id}/not-me", response_class=HTMLResponse)
+async def not_me_page(request: Request, feed_id: str):
+    viewer = require_viewer(request, feed_id)
+    if viewer.is_guest:
+        raise HTTPException(404)
+    return render(request, "not_me.html", viewer)
+
+
+@app.post("/{feed_id}/not-me", response_class=HTMLResponse)
+async def not_me(request: Request, background: BackgroundTasks, feed_id: str, name: str = Form(""), email: str = Form("")):
+    """Someone opened another person's link, e.g. from a forwarded email: sign them out, and pass their
+    request for their own emails to the family, who decide on the setup page."""
+    viewer = require_viewer(request, feed_id)
+    if viewer.is_guest:
+        raise HTTPException(404)
+    feed = viewer.feed
+    name, email = name.strip()[:60], email.strip().lower()
+    response = render(request, "message.html", None, feed=feed, title="Signed out",
+                      text="You're no longer signed in as someone else on this device.")
+    response.delete_cookie(TOKEN_COOKIE, path=f"/{feed.id}")
+    if not name and not email:  # only signing out
+        return response
+    if not name or not EMAIL.match(email):
+        return render(request, "not_me.html", viewer, error="Enter your name and a valid email address.",
+                      name=name, email=email)
+    if feed.by_email(email):
+        response = render(request, "message.html", None, feed=feed, title="You're already in",
+                          text="You get your own emails already. Use the links in those.")
+        response.delete_cookie(TOKEN_COOKIE, path=f"/{feed.id}")
+        return response
+    raw = core.store.get(feed.id)
+    request_text = f"{name} <{email}> opened {viewer.account.name}'s link and asks to get the emails themselves."
+    if raw is not None:  # set up on the setup page: the family decides there
+        requests = raw.setdefault("join_requests", [])
+        if not any(r["email"] == email for r in requests) and len(requests) < JOIN_REQUESTS_MAX:
+            requests.append({"name": name, "email": email, "via": viewer.account.name, "requested_at": now()})
+            core.store.save(raw)
+            background.add_task(_tell_family, feed, raw.get("owner_email"), f"{feed.cfg.title}: {name} asks to join",
+                                f"{request_text}\n\nAdd or decline them on the setup page:\n"
+                                f"{core.settings.public_url}/setup/f/{feed.id}")
+    else:
+        background.add_task(feed.notify_admins, f"{feed.cfg.title}: {name} asks to join",
+                            f"{request_text}\n\nTo add them: add-relative --feed {feed.id} \"{name}\" {email}")
+    response = render(request, "message.html", None, feed=feed, title="Thanks, the family is told",
+                      text="Once they've added you, you get your own emails. Until then you're signed out here.")
+    response.delete_cookie(TOKEN_COOKIE, path=f"/{feed.id}")
+    return response
+
+
+async def _tell_family(feed: Feed, owner_email: str | None, subject: str, body: str) -> None:
+    to = feed.cfg.admin_emails or ([owner_email] if owner_email else [])
+    if not (to and core.settings.smtp_host):
+        return
+    try:
+        await mailer.send(core.settings, mailer.build_simple(feed.cfg.smtp_from, to, subject, body))
+    except Exception:
+        log.exception("Could not tell feed %s about a join request", feed.id)

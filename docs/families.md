@@ -10,6 +10,7 @@ Everyone who can sign in to Immich can set up their own family feed at `PUBLIC_U
 3. **Album and rules:** pick one of your own albums, a title, the sending time and timezone, digest or one-a-day, whether only captioned photos go out, and whether you want an email when someone comments.
 4. **People and chats:**
    - Add relatives by name and email.
+   - Requests from people who opened a relative's link (e.g. a forwarded email) and clicked **Not …?** show up here as "asks to join": **add** them like any relative, or **decline**.
    - Connect co-parents, and relatives who have an Immich account of their own: if Immich signs in through OAuth, the page shows a link for each of them to send (valid 14 days). They open it, sign in to Immich, and are connected; they never see the setup page. Otherwise, paste a key they created in their own account.
    - Remove a relative: takes them out of the album, since its members are who gets the emails. Their Immich account stays; the admin can delete it.
    - Remove a co-parent: Mail-A-Patatina forgets their key and stops sending their photos. Their access to the album in Immich isn't touched.

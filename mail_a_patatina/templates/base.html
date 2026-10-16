@@ -19,6 +19,9 @@
     <nav><a href="{{ base }}/">Feed</a><a href="{{ base }}/calendar">Calendar</a></nav>
     {% endif %}{% endblock %}
   </header>
+  {% if viewer and viewer.account and not viewer.is_guest %}
+  <p class="whoami">Signed in as <b>{{ viewer.name }}</b> · <a href="{{ base }}/not-me">Not {{ viewer.name }}?</a></p>
+  {% endif %}
   <main>{% block main %}{% endblock %}</main>
 </body>
 </html>

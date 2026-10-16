@@ -7,5 +7,5 @@ React or comment: {{ entry_url(e) }}
 {% endfor %}
 
 See all moments: {{ feed_url }}
-These links sign you in, so please don't forward this email.
+These links sign you in as {{ target.name }} for {{ link_days }} days, so please don't forward this email.
 Unsubscribe: {{ unsubscribe_url }}

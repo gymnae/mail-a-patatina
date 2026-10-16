@@ -40,10 +40,15 @@ Each relative gets a viewer-only Immich account that the album is shared with. W
 Every link in the email signs the relative in, using an HMAC-signed token checked against the album's member list:
 - Tapping ❤️ in the email likes the photo. Tapping it again on the page takes the like back, and relatives can delete their own comments.
 - Tapping **Comment** opens the photo page, ready to type.
-- The token is turned into a cookie and removed from the address bar right away.
-- Removing someone from the album in Immich kills their link.
-- Bumping `LINK_VERSION` kills all links at once.
+- The token is removed from the address bar right away. The browser gets a sign-in cookie of its own instead, valid for `SESSION_DAYS` (default 90) and renewed with every visit.
+- Links expire after `LINK_DAYS` (default 7; links in chats after `CHAT_LINK_DAYS`, default 30), so a forwarded email soon stops working. Relatives get fresh links with every email, and an expired link offers **Email me a new link**, which only ever goes to the relative's own address. Unsubscribing works with expired links too.
+- Removing someone from the album in Immich kills their link and sign-in.
+- Bumping `LINK_VERSION` kills all links and sign-ins at once.
 - The ❤️ is only saved by an auto-submitted form on the page, so email security scanners that pre-open links can't like on someone's behalf.
+
+## Forwarded emails
+
+Within its few days, a forwarded link signs the reader in as the relative it was meant for. Every page therefore says **Signed in as Oma Erika**, and the comment box says whose name a comment goes out under. **Not Oma Erika?** signs the reader out and lets them ask for emails of their own: the request shows up on the family's setup page under *People* (the family is emailed), and **add** treats it like adding a relative. For families defined in `feeds.yml`, the request is emailed to `admin_emails` with the `add-relative` command.
 
 ## Group chats
 

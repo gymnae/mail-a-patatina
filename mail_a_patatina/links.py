@@ -7,6 +7,7 @@ import datetime as dt
 import hashlib
 import hmac
 import time
+from dataclasses import dataclass
 from urllib.parse import urlencode
 
 from .config import Settings
@@ -19,28 +20,69 @@ def _sign(s: Settings, payload: str) -> str:
     return base64.urlsafe_b64encode(mac).decode().rstrip("=")[:24]
 
 
-def make_token(s: Settings, feed_id: str, kind: str, ident: str) -> str:
-    """kind 'u' = an Immich user id, kind 'c' = a chat ref. The feed is part of what's signed,
-    so a link from one family's email can never open another family's album."""
-    payload = f"{kind}.{feed_id}.{ident}"
+@dataclass(frozen=True)
+class Token:
+    feed_id: str
+    kind: str  # 'u' = an Immich user id, 'c' = a chat ref
+    ident: str
+    expires: int  # unix time; 0 for links from before links expired
+    expired: bool
+
+
+def make_token(s: Settings, feed_id: str, kind: str, ident: str, days: int | None = None) -> str:
+    """The token in a magic link. The feed is part of what's signed, so a link from one family's email can
+    never open another family's album. It expires after LINK_DAYS (CHAT_LINK_DAYS for chats), so a
+    forwarded email or an old message stops signing anyone in."""
+    if days is None:
+        days = s.chat_link_days if kind == "c" else s.link_days
+    payload = f"{kind}.{feed_id}.{ident}.{int(time.time()) + days * 86400}"
     return f"{payload}.{_sign(s, payload)}"
 
 
-def read_token(s: Settings, token: str) -> tuple[str, str, str] | None:
-    """-> (feed_id, kind, ident), or None if the token isn't genuine."""
-    try:
-        kind, feed_id, ident, sig = token.split(".")
-    except ValueError:
+def read_token(s: Settings, token: str) -> Token | None:
+    """None if the token isn't genuine. An expired one still says whose it was, so that person can be
+    emailed a fresh link (and can still unsubscribe)."""
+    parts = token.split(".")
+    if len(parts) == 4:  # from before links expired: genuine, but expired
+        kind, feed_id, ident, sig = parts
+        expires, payload = "0", f"{kind}.{feed_id}.{ident}"
+    elif len(parts) == 5:
+        kind, feed_id, ident, expires, sig = parts
+        payload = f"{kind}.{feed_id}.{ident}.{expires}"
+    else:
         return None
-    if kind not in ("u", "c") or not hmac.compare_digest(sig, _sign(s, f"{kind}.{feed_id}.{ident}")):
+    if kind not in ("u", "c") or not expires.isdigit() or not hmac.compare_digest(sig, _sign(s, payload)):
         return None
-    return feed_id, kind, ident
+    return Token(feed_id, kind, ident, int(expires), int(expires) < time.time())
+
+
+def make_session(s: Settings, feed_id: str, kind: str, ident: str) -> str:
+    """What the sign-in cookie holds once a link was opened: signed for this purpose only, so a link token
+    can't be used as one, and valid for SESSION_DAYS, renewed while the browser keeps visiting."""
+    payload = f"{kind}.{feed_id}.{ident}.{int(time.time()) + s.session_days * 86400}"
+    return f"{payload}.{_sign(s, f'session.{payload}')}"
+
+
+def read_session(s: Settings, value: str) -> Token | None:
+    """None unless genuine and unexpired. Cookies from before sessions existed hold an old link token:
+    accepted, and replaced by a session right away (expires 0 makes it due for renewal)."""
+    parts = value.split(".")
+    if len(parts) == 4:
+        old = read_token(s, value)
+        return Token(old.feed_id, old.kind, old.ident, 0, False) if old else None
+    if len(parts) != 5:
+        return None
+    kind, feed_id, ident, expires, sig = parts
+    if (kind not in ("u", "c") or not expires.isdigit() or int(expires) < time.time()
+            or not hmac.compare_digest(sig, _sign(s, f"session.{kind}.{feed_id}.{ident}.{expires}"))):
+        return None
+    return Token(feed_id, kind, ident, int(expires), False)
 
 
 def photo_url(s: Settings, feed_id: str, asset_id: str, token: str) -> str:
     """An image link for one recipient's email. Unlike their magic link it signs nobody in, and it stops
     working after PHOTO_LINK_DAYS, or as soon as the photo or the recipient leaves the album."""
-    kind, _, ident, _ = token.split(".")
+    kind, _, ident = token.split(".")[:3]
     expires = int(time.time()) + s.photo_link_days * 86400
     payload = f"{kind}.{ident}.{expires}"
     return f"{s.public_url}/{feed_id}/p/{asset_id}/{payload}.{_sign(s, f'photo.{feed_id}.{asset_id}.{payload}')}.jpg"

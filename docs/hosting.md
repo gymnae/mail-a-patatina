@@ -84,6 +84,8 @@ Point `MAP_IMAGE` in `.env` at your image. If the package is private, run `docke
 
 Running from a checkout without Docker works too: `pip install -r requirements.txt`, then `uvicorn mail_a_patatina.web:app` from the repo root. It reads `.env` and `feeds.yml` from the current folder.
 
+Tests need neither Immich nor SMTP: `pip install -r requirements-dev.txt`, then `python -m pytest` from the repo root. GitHub Actions runs them before building the image.
+
 ## Keep in mind
 
 - **Back up `./secrets` like `.env`.** If the keys are lost, run `add-relative` again for each relative, with password login switched on for a moment. You can see and revoke each key in Immich under the relative's account (*API keys → Mail-A-Patatina*).

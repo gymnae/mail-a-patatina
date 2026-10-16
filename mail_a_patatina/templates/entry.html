@@ -47,6 +47,7 @@
       {% if viewer.needs_name %}
       <input name="name" placeholder="Your name" maxlength="60" required autocomplete="name">
       {% endif %}
+      {% if not viewer.is_guest %}<p class="hint">Commenting as <b>{{ viewer.name }}</b></p>{% endif %}
       <textarea name="body" rows="2" placeholder="Write something nice{% if viewer.name %}, {{ viewer.name }}{% endif %}…" maxlength="2000" required></textarea>
       <button>Send</button>
     </form>

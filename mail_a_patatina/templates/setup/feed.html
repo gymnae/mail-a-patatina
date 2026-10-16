@@ -54,7 +54,17 @@
         <input type="hidden" name="csrf" value="{{ session.csrf }}"><input type="hidden" name="email" value="{{ p.email }}">
         <button class="link">withdraw</button></form></li>
     {% endfor %}
-    {% if not members and not raw.pending %}<li class="hint">Nobody yet.</li>{% endif %}
+    {% for r in raw.join_requests or [] %}
+    <li><b>{{ r.name }}</b> <span class="hint">{{ r.email }}</span> <span class="tag wait">asks to join</span>
+      <span class="hint">opened {{ r.via }}'s link</span>
+      <form method="post" action="/setup/f/{{ raw.id }}/requests/accept" class="inline">
+        <input type="hidden" name="csrf" value="{{ session.csrf }}"><input type="hidden" name="email" value="{{ r.email }}">
+        <button class="link">add</button></form>
+      <form method="post" action="/setup/f/{{ raw.id }}/requests/decline" class="inline">
+        <input type="hidden" name="csrf" value="{{ session.csrf }}"><input type="hidden" name="email" value="{{ r.email }}">
+        <button class="link">decline</button></form></li>
+    {% endfor %}
+    {% if not members and not raw.pending and not raw.join_requests %}<li class="hint">Nobody yet.</li>{% endif %}
   </ul>
   <form method="post" action="/setup/f/{{ raw.id }}/relatives/add" class="row">
     <input type="hidden" name="csrf" value="{{ session.csrf }}">

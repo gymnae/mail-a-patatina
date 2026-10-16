@@ -8,3 +8,5 @@ whatsapp/
 signal/
 .venv/
 **/__pycache__/
+tests/
+requirements-dev.txt

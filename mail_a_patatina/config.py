@@ -42,6 +42,9 @@ class Settings:
     admin_api_key: str
     secret_key: str
     link_version: str
+    link_days: int  # how long a magic link in an email signs someone in
+    chat_link_days: int  # the same for links posted in chats
+    session_days: int  # how long a browser stays signed in after opening a link, renewed on every visit
     user_prefix: str
     public_url: str
     data_dir: Path
@@ -89,6 +92,9 @@ class Settings:
             admin_api_key=env("IMMICH_ADMIN_API_KEY", ""),
             secret_key=_required("SECRET_KEY"),
             link_version=env("LINK_VERSION", "1"),
+            link_days=int(env("LINK_DAYS", "7")),
+            chat_link_days=int(env("CHAT_LINK_DAYS", "30")),
+            session_days=int(env("SESSION_DAYS", "90")),
             user_prefix=env("USER_PREFIX", "patatina-"),
             public_url=_required("PUBLIC_URL").rstrip("/"),
             data_dir=Path(env("DATA_DIR", "/data")),

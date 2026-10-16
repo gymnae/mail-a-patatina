@@ -38,7 +38,9 @@ async def targets(feed: Feed) -> list[Target]:
             out.append(Target(f"user:{m.id}", "email", m.name, m.email, make_token(s, feed.id, "u", m.id), m))
     for chat in feed.cfg.chats:
         person = feed.by_email(chat.person) if chat.person else None
-        token = make_token(s, feed.id, "u", person.id) if person else make_token(s, feed.id, "c", chat.ref)
+        # A one-to-one chat signs in as its person, but its messages stay around as long as a group's.
+        token = (make_token(s, feed.id, "u", person.id, s.chat_link_days) if person
+                 else make_token(s, feed.id, "c", chat.ref))
         out.append(Target(f"chat:{chat.key}", chat.kind, chat.name, chat.address, token, person))
     return out
 

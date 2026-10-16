@@ -155,3 +155,6 @@ button.secondary { background: var(--chip); color: var(--text); }
 .tag.ok { background: #d7f0d2; color: #24561b; }
 .tag.wait { background: #fbe7c0; color: #6b4b10; }
 .setup-card { margin-bottom: 12px; }
+
+.whoami { max-width: 640px; margin: 0 auto 12px; padding: 0 16px; color: var(--muted); font-size: 14px; }
+.whoami a { color: inherit; }

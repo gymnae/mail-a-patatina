@@ -47,6 +47,7 @@ def build_digest(
         "entry_url": lambda e, like=False: entry_url(s, feed.id, e.asset_id, target.token, like),
         "feed_url": feed_url(s, feed.id, target.token),
         "unsubscribe_url": unsubscribe_url(s, feed.id, target.token),
+        "link_days": s.link_days,
     }
 
     msg = EmailMessage()

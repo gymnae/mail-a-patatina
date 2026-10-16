@@ -20,11 +20,13 @@ jobs:
         with:
           python-version: "3.13"
           cache: pip
-      - run: pip install -r requirements.txt
+      - run: pip install -r requirements-dev.txt
       - name: Byte-compile and import
         run: |
           python -m compileall -q mail_a_patatina
           python -c "import mail_a_patatina.web, mail_a_patatina.__main__"
+      - name: Tests
+        run: python -m pytest -q
 
   image:
     needs: check
