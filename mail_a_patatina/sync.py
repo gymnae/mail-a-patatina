@@ -83,7 +83,8 @@ async def run(feed: Feed) -> None:
             marker = {"ready": ready, "sent": {}}
             to_write[asset["ownerId"]][asset["id"]] = marker
         local = asset["localDateTime"]  # wall-clock time where the photo was taken
-        entry = Entry(asset["id"], asset["ownerId"], asset["type"], local[:19], caption, asset.get("updatedAt", ""), marker)
+        entry = Entry(asset["id"], asset["ownerId"], asset["type"], local[:19], caption, asset.get("updatedAt", ""), marker,
+                      asset.get("livePhotoVideoId") or "")
         if previous and previous.updated_at != entry.updated_at:
             feed.core.media.purge(entry.asset_id)
         entries.append(entry)

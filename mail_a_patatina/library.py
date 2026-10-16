@@ -29,6 +29,7 @@ class Entry:
     updated_at: str
     # Stored in Immich asset metadata: {"ready": iso, "sent": {target_key: iso}}
     marker: dict = field(default_factory=dict)
+    live_video_id: str = ""  # the motion part of a live photo, a hidden video asset in Immich
 
     @property
     def day(self) -> str:

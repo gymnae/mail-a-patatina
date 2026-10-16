@@ -390,9 +390,12 @@ async def emailed_photo(feed_id: str, asset_id: str, ticket: str):
 @app.get("/{feed_id}/video/{asset_id}")
 async def video(request: Request, feed_id: str, asset_id: str):
     feed = require_viewer(request, feed_id).feed
-    if shared_entry(feed, asset_id).type != "VIDEO":
+    entry = shared_entry(feed, asset_id)
+    # A video, or the motion part of a live photo (a hidden asset, so never looked up by its own id).
+    video_id = entry.asset_id if entry.type == "VIDEO" else entry.live_video_id
+    if not video_id:
         raise HTTPException(404)
-    upstream = await feed.curator.open_video(asset_id, request.headers.get("range"))
+    upstream = await feed.curator.open_video(video_id, request.headers.get("range"))
     keep = ("content-type", "content-length", "content-range", "accept-ranges")
     return StreamingResponse(
         upstream.aiter_raw(), status_code=upstream.status_code,

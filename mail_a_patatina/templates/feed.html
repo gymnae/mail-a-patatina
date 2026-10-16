@@ -2,7 +2,15 @@
 {% block main %}
 {% for e, a in cards %}
 <a class="card" href="{{ base }}/e/{{ e.asset_id }}">
+  {% if e.live_video_id %}
+  <div class="live">
+    <img src="{{ base }}/media/{{ e.asset_id }}/preview" alt="{{ e.caption }}" loading="lazy">
+    <video muted playsinline loop preload="none" src="{{ base }}/video/{{ e.asset_id }}" aria-hidden="true"></video>
+    <span class="live-badge">LIVE</span>
+  </div>
+  {% else %}
   <img src="{{ base }}/media/{{ e.asset_id }}/preview" alt="{{ e.caption }}" loading="lazy">
+  {% endif %}
   <div class="card-body">
     <p class="date">{{ e.taken_at | nice_date }}{% if e.type == "VIDEO" %} · ▶️ video{% endif %}</p>
     {% if e.caption %}<p class="caption">{{ e.caption }}</p>{% endif %}
