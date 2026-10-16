@@ -18,7 +18,8 @@ _warned_owners: set[tuple[str, str]] = set()
 
 # Descriptions that cameras and apps write into EXIF, which Immich imports as if someone had typed them.
 CAMERA_DEFAULTS = {"olympus digital camera", "sony dsc", "default", "image", "picture", "dcim", "digital camera",
-                   "samsung", "lg electronics", "minolta dsc", "kodak digital still camera", "exif_jpeg_picture"}
+                   "samsung", "lg electronics", "minolta dsc", "kodak digital still camera", "exif_jpeg_picture",
+                   "screenshot"}
 MACHINE_TEXT = re.compile(r"^[A-Za-z0-9+/=_-]{24,}$")  # e.g. Snapchat's base64 metadata blob
 
 
