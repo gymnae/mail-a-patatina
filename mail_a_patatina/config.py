@@ -8,6 +8,7 @@ from __future__ import annotations
 import hashlib
 import os
 import re
+import unicodedata
 from dataclasses import dataclass, field
 from email.utils import formataddr, parseaddr
 from pathlib import Path
@@ -25,6 +26,13 @@ def _list(value) -> list[str]:
     if isinstance(value, list):
         return [str(v).strip() for v in value if str(v).strip()]
     return [v.strip() for v in str(value or "").split(",") if v.strip()]
+
+
+def clean_email(value: str) -> str:
+    """An address as typed, pasted or stored: lowercased, without surrounding whitespace and without
+    invisible characters (zero-width spaces, soft hyphens, byte-order marks) that copy-paste drags along
+    and that make mail silently go nowhere."""
+    return "".join(ch for ch in str(value) if unicodedata.category(ch) != "Cf").strip().lower()
 
 
 def _bool(value, default: bool) -> bool:
@@ -230,7 +238,7 @@ def _chats(items) -> list[ChatSpec]:
         if kind not in CHAT_KINDS:
             raise SystemExit(f"Unknown chat channel {kind!r}, expected one of {CHAT_KINDS}")
         address = str(c["chat_id"]).strip()
-        person = str(c["person"]).strip().lower() if c.get("person") else None
+        person = clean_email(c["person"]) if c.get("person") else None
         chats.append(ChatSpec(kind, str(c.get("name") or address), address, person))
     return chats
 

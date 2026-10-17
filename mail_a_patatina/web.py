@@ -25,7 +25,7 @@ from fastapi.templating import Jinja2Templates
 from starlette.background import BackgroundTask
 
 from . import mailer
-from .config import ChatSpec, Settings
+from .config import ChatSpec, Settings, clean_email
 from .core import Core, Feed
 from .i18n import from_header, install
 from .i18n import t as translate  # `t` is the magic-link parameter here
@@ -33,7 +33,7 @@ from .immich import LoginFailed
 from .library import Entry, now
 from .links import LIKE, make_session, make_token, read_photo_ticket, read_session, read_token
 from .people import Member
-from .setup import EMAIL
+from .setup import ASSET_VERSION, EMAIL
 from .setup import router as setup_router
 
 log = logging.getLogger(__name__)
@@ -81,6 +81,7 @@ app.mount("/static", StaticFiles(directory=HERE / "static"), name="static")
 app.include_router(setup_router)  # before the /{feed_id} routes, so /setup is never taken for a feed
 templates = Jinja2Templates(directory=HERE / "templates")
 install(templates.env)
+templates.env.globals["asset_version"] = ASSET_VERSION
 
 
 # --- which feed, and who is looking ------------------------------------------
@@ -545,7 +546,7 @@ async def not_me(request: Request, background: BackgroundTasks, feed_id: str, na
     if viewer.is_guest:
         raise HTTPException(404)
     feed = viewer.feed
-    name, email = name.strip()[:60], email.strip().lower()
+    name, email = name.strip()[:60], clean_email(email)
     response = message_page(request, "Signed out", "You're no longer signed in as someone else on this device.",
                             feed=feed)
     response.delete_cookie(TOKEN_COOKIE, path=f"/{feed.id}")

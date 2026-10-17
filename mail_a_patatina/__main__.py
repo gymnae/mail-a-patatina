@@ -11,7 +11,7 @@ from contextlib import asynccontextmanager
 import httpx
 
 from . import dispatch
-from .config import Settings
+from .config import Settings, clean_email
 from .core import Core, Feed
 from .immich import KEY_NAME, RELATIVE_PERMISSIONS, Immich, LoginFailed
 from .links import derived_password, feed_url, make_token
@@ -67,7 +67,7 @@ async def add_account(
     s = core.settings
     if not s.admin_api_key:
         raise SystemExit("Set IMMICH_ADMIN_API_KEY (an admin's key with adminUser.read/create/update) for this command")
-    email = email.strip().lower()
+    email = clean_email(email)
     admin = Immich(s.immich_url, api_key=s.admin_api_key)
     try:
         async with password_login(admin):
@@ -84,7 +84,7 @@ async def _setup_account(
     # Managed accounts are recognisable in Immich's user list by their prefix; pages and emails drop it.
     immich_name = name if name.startswith(s.user_prefix) else f"{s.user_prefix}{name}"
     name = core.people.display_name(immich_name)
-    existing = next((u for u in await admin.admin_users(with_deleted=True) if u["email"].lower() == email), None)
+    existing = next((u for u in await admin.admin_users(with_deleted=True) if clean_email(u["email"]) == email), None)
     if existing and existing.get("deletedAt"):
         # Deleted in Immich but not purged yet: the email is still taken, so the account has to come back.
         try:
@@ -188,7 +188,7 @@ async def forget(core: Core, email: str) -> None:
     Mail-A-Patatina created (named with USER_PREFIX), and only if no album at all is shared with them,
     including albums outside Mail-A-Patatina."""
     s = core.settings
-    email = email.strip().lower()
+    email = clean_email(email)
     if not s.admin_api_key:
         raise SystemExit("Set IMMICH_ADMIN_API_KEY (adminUser.read, adminUser.delete) for this command")
     waiting = [raw["id"] for raw in core.store.all().values() if any(p["email"] == email for p in raw.get("pending", []))]
@@ -196,7 +196,7 @@ async def forget(core: Core, email: str) -> None:
         raise SystemExit(f"{email} is waiting for approval in {', '.join(waiting)}; `reject` them there first")
     admin = Immich(s.immich_url, api_key=s.admin_api_key)
     try:
-        user = next((u for u in await admin.admin_users() if u["email"].lower() == email), None)
+        user = next((u for u in await admin.admin_users() if clean_email(u["email"]) == email), None)
         if user is None:
             save_key(s.keys_file, email, None)
             print(f"{email} has no Immich account (anymore). Its key, if any, is removed.")
@@ -259,7 +259,7 @@ async def approve(core: Core, feed_id: str | None, email: str | None) -> None:
         feed = core.feeds[raw["id"]]
         await feed.sync()
         for p in list(raw.get("pending", [])):
-            if email and p["email"] != email.lower():
+            if email and p["email"] != clean_email(email):
                 continue
             try:
                 member = await add_account(core, feed, p["name"], p["email"], "viewer", False, wants_email=True)
@@ -362,7 +362,7 @@ async def main() -> None:
             if raw is None:
                 raise SystemExit("Name the feed with --feed (only feeds from the setup page have waiting relatives)")
             before = len(raw.get("pending", []))
-            raw["pending"] = [p for p in raw.get("pending", []) if p["email"] != args.email.lower()]
+            raw["pending"] = [p for p in raw.get("pending", []) if p["email"] != clean_email(args.email)]
             core.store.save(raw)
             print("Dropped." if len(raw["pending"]) < before else "No such waiting relative.")
             return
@@ -400,7 +400,7 @@ async def main() -> None:
         elif args.cmd == "send-test":
             feed = feeds[0]
             target = next(
-                (t for t in await dispatch.targets(feed) if t.kind == "email" and t.address == args.email.lower()), None
+                (t for t in await dispatch.targets(feed) if t.kind == "email" and t.address == clean_email(args.email)), None
             )
             if target is None:
                 raise SystemExit(f"{args.email} isn't a relative in the album of “{feed.id}” who gets email")

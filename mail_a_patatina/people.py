@@ -16,7 +16,7 @@ from typing import TypeVar
 import httpx
 import yaml
 
-from .config import Settings
+from .config import Settings, clean_email
 from .immich import Immich, LoginFailed
 from .links import derived_password
 
@@ -28,12 +28,12 @@ def load_keys(path: Path) -> dict[str, str]:
     """email -> that person's own Immich API key. Credentials, kept next to .env, not data."""
     if not path.exists():
         return {}
-    return {k.lower(): v for k, v in (yaml.safe_load(path.read_text(encoding="utf-8")) or {}).items()}
+    return {clean_email(k): v for k, v in (yaml.safe_load(path.read_text(encoding="utf-8")) or {}).items()}
 
 
 def save_key(path: Path, email: str, key: str | None) -> None:
     """Store a person's key, or drop it (key None)."""
-    keys = load_keys(path) | {email.lower(): key}
+    keys = load_keys(path) | {clean_email(email): key}
     keys = {k: v for k, v in keys.items() if v is not None}
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(".tmp")
@@ -62,6 +62,7 @@ class People:
         self._sessions: dict[str, Immich] = {}
         self._locks: defaultdict[str, asyncio.Lock] = defaultdict(asyncio.Lock)
         self._unmanaged: set[str] = set()  # members we can't act as (no key, and no password login)
+        self._no_email: dict[str, str] = {}  # member id -> why they get no email, logged once per change
 
     async def reload_keys(self) -> None:
         keys = load_keys(self.s.keys_file)
@@ -85,7 +86,7 @@ class People:
         """An album's members by user id."""
         return {
             u["user"]["id"]: Member(
-                u["user"]["id"], self.display_name(u["user"]["name"]), u["user"]["email"].lower(), u["role"],
+                u["user"]["id"], self.display_name(u["user"]["name"]), clean_email(u["user"]["email"]), u["role"],
                 self.is_managed(u["user"]["name"]),
             )
             for u in album_users
@@ -133,9 +134,19 @@ class People:
         """The member's own Immich email-notification switch doubles as the unsubscribe flag."""
         try:
             prefs = await self.run_as(member, lambda c: c.preferences())
-        except LoginFailed:
-            return False
-        return bool(prefs.get("emailNotifications", {}).get("enabled", True))
+        except LoginFailed as e:
+            return self._skip(member, f"can't sign in as them ({str(e) or 'no API key'})")
+        if not prefs.get("emailNotifications", {}).get("enabled", True):
+            return self._skip(member, "email notifications are switched off in their Immich account (or they unsubscribed)")
+        if self._no_email.pop(member.id, None):
+            log.info("%s gets email again", member.email)
+        return True
+
+    def _skip(self, member: Member, reason: str) -> bool:
+        if self._no_email.get(member.id) != reason:
+            log.warning("No email to %s: %s", member.email, reason)
+            self._no_email[member.id] = reason
+        return False
 
     async def aclose(self) -> None:
         for client in self._sessions.values():

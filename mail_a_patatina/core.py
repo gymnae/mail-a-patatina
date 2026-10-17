@@ -14,7 +14,7 @@ import httpx
 from . import dispatch, mailer, sync
 from apscheduler.triggers.cron import CronTrigger
 
-from .config import FeedConfig, Settings, feed_config, load_feeds
+from .config import FeedConfig, Settings, clean_email, feed_config, load_feeds
 from .i18n import Remembered
 from .immich import Immich
 from .library import Library
@@ -50,7 +50,7 @@ class Feed:
         return next((m for m in self.members.values() if m.email == self.cfg.bot_email), None)
 
     def by_email(self, email: str) -> Member | None:
-        return next((m for m in self.members.values() if m.email == email.lower()), None)
+        return next((m for m in self.members.values() if m.email == clean_email(email)), None)
 
     def others(self) -> list[Member]:
         """Everyone the album is shared with, except its owner and the bot."""

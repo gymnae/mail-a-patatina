@@ -27,7 +27,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
 
 from . import dispatch, mailer
-from .config import CHAT_KINDS
+from .config import CHAT_KINDS, clean_email
 from .immich import CONTRIBUTOR_PERMISSIONS, KEY_NAME, OWNER_PERMISSIONS, RELATIVE_PERMISSIONS, Immich, LoginFailed
 from .library import now
 from .i18n import from_header, install
@@ -39,11 +39,17 @@ log = logging.getLogger(__name__)
 router = APIRouter(prefix="/setup")
 templates = Jinja2Templates(directory=Path(__file__).parent / "templates")
 install(templates.env)  # English here, except on the invite pages relatives and co-parents open
+# Appended to the stylesheet and script links, so browsers fetch them again after an update.
+ASSET_VERSION = hashlib.sha256(
+    b"".join(p.read_bytes() for p in sorted((Path(__file__).parent / "static").glob("*.[cj]s*")))
+).hexdigest()[:10]
+templates.env.globals["asset_version"] = ASSET_VERSION
 
 COOKIE = "map_setup"
 IDLE_SECONDS = 3600
 LOGIN_SECONDS = 600
-EMAIL = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+# Printable ASCII only (! to ~, without @): anything else in an address is almost always a stray character.
+EMAIL = re.compile(r"^[!-?A-~]+@[!-?A-~]+\.[!-?A-~]+$")
 TIME = re.compile(r"^([01]\d|2[0-3]):[0-5]\d$")
 TIMEZONES = sorted(zoneinfo.available_timezones())
 
@@ -114,7 +120,7 @@ def require(request: Request, csrf: str | None = None) -> SetupSession:
 
 def start_session(request: Request, email: str, name: str) -> Response:
     sid = secrets.token_urlsafe(32)
-    SESSIONS[sid] = SetupSession(email.lower(), name or email)
+    SESSIONS[sid] = SetupSession(clean_email(email), name or email)
     response = RedirectResponse("/setup/", status_code=303)
     response.set_cookie(COOKIE, sid, path="/setup", httponly=True, samesite="lax",
                         secure=settings(request).secure_cookies)
@@ -200,7 +206,7 @@ def page(request: Request, template: str, session: SetupSession | None, status: 
 
 def owned(request: Request, session: SetupSession, feed_id: str) -> dict:
     raw = core(request).store.get(feed_id) if re.match(r"^[a-z0-9-]{1,32}$", feed_id) else None
-    if raw is None or str(raw.get("owner_email", "")).lower() != session.email:
+    if raw is None or clean_email(raw.get("owner_email", "")) != session.email:
         raise HTTPException(404)
     return raw
 
@@ -248,7 +254,7 @@ async def check_key(request: Request, key: str, needed: list[str]) -> tuple[dict
 async def check_owner_key(request: Request, key: str, email: str) -> tuple[dict | None, str | None]:
     """-> (Immich user, None) if the key may be used as an album-owner key for `email`, else (None, problem)."""
     me, problem = await check_key(request, key, OWNER_PERMISSIONS)
-    if me and me["email"].lower() != email:
+    if me and clean_email(me["email"]) != email:
         return None, f"This key belongs to {me['email']}, but you signed in as {email}."
     return me, problem
 
@@ -347,7 +353,7 @@ async def immich_callback(request: Request, state: str = "", error: str = ""):
         return connect_failed(request, session, feed_id, "Immich didn't accept the sign-in. Create a key by hand instead.")
     try:
         me = await immich.me()
-        if me["email"].lower() != session.email:
+        if clean_email(me["email"]) != session.email:
             return connect_failed(request, session, feed_id,
                                   f"You signed in to Immich as {me['email']}, but to this page as {session.email}.")
         key = await immich.create_api_key(KEY_NAME, OWNER_PERMISSIONS)
@@ -951,7 +957,7 @@ async def decline_request(request: Request, feed_id: str, csrf: str = Form(), em
 
 
 async def add_person(request: Request, raw: dict, feed_id: str, name: str, email: str) -> Response:
-    email, name = email.strip().lower(), name.strip()[:60]
+    email, name = clean_email(email), name.strip()[:60]
     if not name or not EMAIL.match(email):
         return back(feed_id, error="Enter a name and a valid email address.")
     feed = core(request).feeds.get(feed_id)
@@ -961,7 +967,7 @@ async def add_person(request: Request, raw: dict, feed_id: str, name: str, email
         # Someone with an Immich account of their own needs no new account and so no approval: share the
         # album with it. (Only works if Immich shows other users to non-admins; else `approve` does it.)
         try:
-            user = next((u for u in await feed.curator.users() if u["email"].lower() == email), None)
+            user = next((u for u in await feed.curator.users() if clean_email(u["email"]) == email), None)
         except httpx.HTTPError:
             user = None
         if user and not core(request).people.is_managed(user["name"]):

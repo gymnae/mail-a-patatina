@@ -6,10 +6,10 @@
   <meta name="robots" content="noindex, nofollow">
   <meta name="referrer" content="no-referrer">
   <title>{% block title %}{{ site_title }}{% endblock %}</title>
-  <link rel="stylesheet" href="/static/style.css">
+  <link rel="stylesheet" href="/static/style.css?v={{ asset_version }}">
   <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
-  <script src="/static/live.js" defer></script>
+  <script src="/static/live.js?v={{ asset_version }}" defer></script>
   {% block head %}{% endblock %}
 </head>
 <body{% if protect %} class="protect"{% endif %}>
