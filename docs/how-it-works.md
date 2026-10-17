@@ -18,7 +18,7 @@ Mail-A-Patatina only **transports, presents and collects**. It has no database: 
 |---|---|
 | Photos, captions, dates | Immich assets and their description |
 | What's shared | One album (photos with a description, if `REQUIRE_CAPTION=true`) |
-| Who gets email | The people the album is shared with (not the owner, not the bot) |
+| Who gets email | The people the album is shared with (not the owner, the co-parents or the bot) |
 | Likes and comments | Immich album activity, posted as each relative's own Immich account |
 | What was already sent, and to whom | Immich asset metadata, key `mail-a-patatina` |
 | Unsubscribed | The relative's own Immich *email notifications* setting |

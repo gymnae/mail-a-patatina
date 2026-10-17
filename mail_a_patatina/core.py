@@ -52,9 +52,19 @@ class Feed:
     def by_email(self, email: str) -> Member | None:
         return next((m for m in self.members.values() if m.email == email.lower()), None)
 
-    def relatives(self) -> list[Member]:
-        """Members who get the daily email: everyone the album is shared with, except its owner and the bot."""
+    def others(self) -> list[Member]:
+        """Everyone the album is shared with, except its owner and the bot."""
         return [m for m in self.members.values() if m.role != "owner" and m.email != self.cfg.bot_email]
+
+    def is_coparent(self, m: Member) -> bool:
+        """Adds photos rather than receiving them: a connected co-parent, or someone still to connect as one
+        (has photos in the album but no key here, or is an editor with an Immich account of their own)."""
+        connected = m.id in self.writers and self.writers[m.id] is not self.curator
+        return connected or m.id in self.unkeyed or (m.role == "editor" and not m.managed)
+
+    def relatives(self) -> list[Member]:
+        """Members who get the daily email: everyone else the album is shared with, but not the co-parents."""
+        return [m for m in self.others() if not self.is_coparent(m)]
 
     async def identify_keys(self) -> None:
         me = await self.curator.me()

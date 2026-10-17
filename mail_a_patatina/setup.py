@@ -582,10 +582,10 @@ async def feed_page(request: Request, feed_id: str, msg: str = "", error: str = 
     members, waiting_coparents = [], []
     if feed is not None:
         keyed = contributor_keys(feed)
-        for m in feed.relatives():
+        for m in feed.others():
             if m.id in keyed:
                 continue  # listed under co-parents
-            if m.id in feed.unkeyed or (m.role == "editor" and not m.managed):
+            if feed.is_coparent(m):
                 # adds photos (or may): a co-parent still to connect
                 waiting_coparents.append({"id": m.id, "name": m.name, "email": m.email,
                                           "invite": invite_url(s, feed_id, m.id, "coparent") if invites else None})
