@@ -167,12 +167,6 @@ _TEXTS: dict[str, tuple[str, str, str, str, str]] = {  # English: (German, Frenc
         "Kalenteri",
         "Календарь",
         "Календар"),
-    "Signed in as": (
-        "Angemeldet als",
-        "Connecté en tant que",
-        "Kirjautuneena:",
-        "Вы вошли как",
-        "Ви увійшли як"),
     "Not {name}?": (
         "Nicht {name}?",
         "Vous n'êtes pas {name} ?",

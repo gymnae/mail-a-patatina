@@ -37,7 +37,14 @@ async def targets(feed: Feed) -> list[Target]:
     lang = lambda member: (member and feed.core.languages.get(member.id)) or s.default_language  # noqa: E731
     out = []
     for m in feed.relatives():
-        if await people.wants_email(m):
+        try:
+            wanted = await people.wants_email(m)
+        except Exception:
+            # One person's account trouble (a key without the right permissions, Immich hiccup) must not
+            # stop everyone else's email.
+            log.exception("Feed %s: can't tell whether %s wants email; skipping them this time", feed.id, m.email)
+            continue
+        if wanted:
             out.append(Target(f"user:{m.id}", "email", m.name, m.email, make_token(s, feed.id, "u", m.id), m, lang(m)))
     for chat in feed.cfg.chats:
         person = feed.by_email(chat.person) if chat.person else None

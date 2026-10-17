@@ -48,7 +48,7 @@ Every link in the email signs the relative in, using an HMAC-signed token checke
 
 ## Forwarded emails
 
-Within its few days, a forwarded link signs the reader in as the relative it was meant for. Every page therefore says **Signed in as Oma Erika**, and the comment box says whose name a comment goes out under. **Not Oma Erika?** signs the reader out and lets them ask for emails of their own: the request shows up on the family's setup page under *People* (the family is emailed), and **add** treats it like adding a relative. For families defined in `feeds.yml`, the request is emailed to `admin_emails` with the `add-relative` command.
+Within its few days, a forwarded link signs the reader in as the relative it was meant for. The comment box therefore says whose name a comment goes out under, and every page ends with **Not Oma Erika?**, which signs the reader out and lets them ask for emails of their own: the request shows up on the family's setup page under *People* (the family is emailed), and **add** treats it like adding a relative. For families defined in `feeds.yml`, the request is emailed to `admin_emails` with the `add-relative` command.
 
 ## Group chats
 

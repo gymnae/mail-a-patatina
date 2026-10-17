@@ -59,7 +59,7 @@ def test_every_text_in_the_templates_has_a_translation():
 def test_page_in_the_browsers_language(client, family, settings, oma):
     client.get(f"/falks/?t={links.make_token(settings, 'falks', 'u', oma.id)}")
     r = client.get("/falks/", headers={"Accept-Language": "de-DE,de;q=0.9"})
-    assert '<html lang="de">' in r.text and "Angemeldet als <b>Oma Erika</b>" in r.text
+    assert '<html lang="de">' in r.text and "Nicht Oma Erika?" in r.text
     assert "Kalender" in r.text and "Noch nichts geteilt." in r.text
     assert family.languages.get(oma.id) == "de"
 
@@ -74,9 +74,9 @@ def test_browser_without_a_language_of_ours_gets_the_default_and_nothing_is_reme
 def test_page_in_russian_and_ukrainian(client, settings, oma):
     client.get(f"/falks/?t={links.make_token(settings, 'falks', 'u', oma.id)}")
     r = client.get("/falks/calendar?m=2026-10", headers={"Accept-Language": "ru"})
-    assert '<html lang="ru">' in r.text and "Вы вошли как <b>Oma Erika</b>" in r.text and "Октябрь 2026" in r.text
+    assert '<html lang="ru">' in r.text and "Вы не Oma Erika?" in r.text and "Октябрь 2026" in r.text
     r = client.get("/falks/calendar?m=2026-10", headers={"Accept-Language": "uk-UA"})
-    assert "Ви увійшли як" in r.text and "Жовтень 2026" in r.text and ">нд<" in r.text
+    assert "Ви не Oma Erika?" in r.text and "Жовтень 2026" in r.text and ">нд<" in r.text
 
 
 def test_messages_are_translated(make_client):

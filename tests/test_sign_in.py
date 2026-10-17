@@ -17,7 +17,7 @@ def test_link_signs_in_with_a_session_not_the_link(client, settings, oma):
     cookie = client.cookies.get("map_t")
     assert cookie != token and links.read_session(settings, cookie).ident == oma.id
     r = client.get("/falks/")
-    assert r.status_code == 200 and "Signed in as <b>Oma Erika</b>" in r.text
+    assert r.status_code == 200 and "Not Oma Erika?" in r.text
 
 
 def test_expired_link_signs_nobody_in_and_offers_a_new_one(client, settings, oma):
