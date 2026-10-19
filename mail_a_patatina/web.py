@@ -354,6 +354,23 @@ async def calendar_page(request: Request, feed_id: str, m: str | None = None):
     )
 
 
+@app.get("/{feed_id}/day/{day}", response_class=HTMLResponse)
+async def day_page(request: Request, feed_id: str, day: str):
+    viewer = require_viewer(request, feed_id)
+    feed = viewer.feed
+    try:
+        date = dt.date.fromisoformat(day)
+    except ValueError:
+        raise HTTPException(404) from None
+    entries = feed.library.day(date.isoformat())
+    if not entries:
+        raise HTTPException(404)
+    activities = await feed.activities()
+    cards = [(e, _for_asset(feed, activities, e.asset_id, viewer)) for e in entries]
+    prev_day, next_day = feed.library.days_around(date.isoformat())
+    return render(request, "feed.html", viewer, cards=cards, day=date, prev_day=prev_day, next_day=next_day)
+
+
 @app.get("/{feed_id}/e/{asset_id}", response_class=HTMLResponse)
 async def entry_page(request: Request, feed_id: str, asset_id: str, like: str | None = None):
     viewer = require_viewer(request, feed_id)

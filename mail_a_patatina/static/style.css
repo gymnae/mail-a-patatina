@@ -98,6 +98,7 @@ textarea { resize: vertical; }
 .month-nav { margin: 0 0 16px; }
 .month-nav h1 { font-size: 20px; margin: 0; }
 .month-nav a { font-size: 22px; padding: 4px 12px; }
+.month-nav h1 a { font-size: inherit; padding: 0; color: inherit; }
 
 .calendar { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
 .dow { text-align: center; color: var(--muted); font-size: 12px; padding-bottom: 4px; }

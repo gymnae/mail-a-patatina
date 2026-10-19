@@ -65,6 +65,17 @@ class Library:
         older = self.ordered[i - 1] if i > 0 else None
         return newer, older
 
+    def day(self, yyyy_mm_dd: str) -> list[Entry]:
+        """One day's moments, oldest first, like that day's dispatch."""
+        return [e for e in self.ordered if e.day == yyyy_mm_dd]
+
+    def days_around(self, yyyy_mm_dd: str) -> tuple[str | None, str | None]:
+        """(previous, next) day that has moments"""
+        days = sorted({e.day for e in self.ordered})
+        before = [d for d in days if d < yyyy_mm_dd]
+        after = [d for d in days if d > yyyy_mm_dd]
+        return (before[-1] if before else None), (after[0] if after else None)
+
     def month(self, yyyy_mm: str) -> dict[str, list[Entry]]:
         by_day: dict[str, list[Entry]] = {}
         for e in self.ordered:

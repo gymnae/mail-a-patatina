@@ -1,5 +1,13 @@
 {% extends "base.html" %}
+{% block title %}{% if day %}{{ day.isoformat() | nice_date }} · {{ site_title }}{% else %}{{ super() }}{% endif %}{% endblock %}
 {% block main %}
+{% if day %}
+<nav class="pager month-nav">
+  {% if prev_day %}<a href="{{ base }}/day/{{ prev_day }}">←</a>{% else %}<span></span>{% endif %}
+  <h1><a href="{{ base }}/calendar?m={{ day.isoformat()[:7] }}">{{ day.isoformat() | nice_date }}</a></h1>
+  {% if next_day %}<a href="{{ base }}/day/{{ next_day }}">→</a>{% else %}<span></span>{% endif %}
+</nav>
+{% endif %}
 {% for e, a in cards %}
 <a class="card" href="{{ base }}/e/{{ e.asset_id }}">
   {% if e.live_video_id %}
