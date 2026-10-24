@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}{{ trip.title }} · {{ site_title }}{% endblock %}
+{% block main %}
+<nav class="pager back"><a href="{{ base }}/trips/">← {{ _("Trips") }}</a></nav>
+<h1 class="page-title">{{ trip.title }}</h1>
+{% if trip.intro %}<div class="prose">{{ trip.intro | safe }}</div>{% endif %}
+{% for p in trip.posts %}
+<a class="card" href="{{ base }}/trips/{{ trip.slug }}/{{ p.slug }}">
+  {% if p.media %}<img src="{{ base }}/trips/{{ trip.slug }}/{{ p.slug }}/{{ p.media[0].asset_id }}/preview" alt="{{ p.media[0].caption }}" loading="lazy">{% endif %}
+  <div class="card-body">
+    <p class="date">{{ p.when | nice_date }}{% if p.place %} · {{ p.place }}{% endif %}</p>
+    {% if p.title %}<p class="caption">{{ p.title }}</p>{% endif %}
+    {% if p.excerpt %}<p class="excerpt">{{ p.excerpt }}</p>{% endif %}
+  </div>
+</a>
+{% else %}
+<p class="empty">{{ _("Nothing shared yet.") }}</p>
+{% endfor %}
+{% endblock %}

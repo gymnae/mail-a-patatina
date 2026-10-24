@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}{{ _("Trips") }} · {{ site_title }}{% endblock %}
+{% block main %}
+{% for trip in trips %}
+{% set cover = trip.cover %}
+<a class="card" href="{{ base }}/trips/{{ trip.slug }}/">
+  {% if cover %}<img src="{{ base }}/trips/{{ trip.slug }}/{{ cover[0].slug }}/{{ cover[1].asset_id }}/preview" alt="{{ cover[1].caption }}" loading="lazy">{% endif %}
+  <div class="card-body">
+    {% if trip.start %}<p class="date">{{ trip.start | month_year }}</p>{% endif %}
+    <p class="caption">{{ trip.title }}</p>
+  </div>
+</a>
+{% else %}
+<p class="empty">{{ _("No trips shared yet.") }}</p>
+{% endfor %}
+{% endblock %}

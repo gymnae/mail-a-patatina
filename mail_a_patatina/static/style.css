@@ -113,6 +113,22 @@ textarea { resize: vertical; }
 }
 .day .more { position: absolute; bottom: 3px; right: 5px; font-size: 12px; }
 
+/* trips */
+.page-title { font-size: 26px; line-height: 1.25; margin: 4px 0 12px; }
+.back { margin: 0 0 8px; }
+.excerpt { color: var(--muted); font-size: 15px; margin: 4px 0 0; }
+.prose { overflow-wrap: anywhere; }
+.prose img { margin: 12px 0; }
+.prose blockquote { margin: 12px 0; padding-left: 14px; border-left: 3px solid var(--line); color: var(--muted); }
+.gallery { display: grid; gap: 16px; margin: 20px 0; }
+.gallery.several { grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+.gallery figure > a { display: block; }
+.gallery figcaption { font-size: 15px; margin: 6px 0 0; }
+.photo-reactions { display: flex; gap: 12px; align-items: center; margin-top: 6px; font-size: 14px; color: var(--muted); }
+.photo-reactions form { margin: 0; }
+.photo-reactions a { text-decoration: none; }
+button.react.small, .react.static.small { font-size: 16px; padding: 4px 12px; }
+
 .message { text-align: center; padding: 48px 0; }
 .message h1 { font-size: 24px; }
 .empty { color: var(--muted); text-align: center; padding: 48px 0; }

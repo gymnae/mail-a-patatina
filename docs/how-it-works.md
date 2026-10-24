@@ -24,6 +24,8 @@ Mail-A-Patatina only **transports, presents and collects**. It has no database: 
 | Unsubscribed | The relative's own Immich *email notifications* setting |
 | Families, chats, SMTP, schedule | Configuration: `.env` and `config/feeds.yml` or `config/chats.yml` |
 | The relatives' API keys | Credentials: `./secrets/relatives.yml`, next to `.env` |
+| Trips: their text | Markdown files in `./journal/<feed id>/`, see [Trips](journal.md) |
+| Trips: photos, readers, likes and comments | One Immich album per trip, like the feed's |
 
 `./data` only holds a cache of resized JPEGs and each relative's last browser language, and is safe to delete. Restarting or rebuilding the container loses nothing.
 

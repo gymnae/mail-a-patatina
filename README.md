@@ -14,6 +14,7 @@ Add a photo to a shared Immich album and write a caption. The next morning, gran
 - **Reactions come home.** Likes and comments are real Immich activity, so you see them in your Immich app and can reply there.
 - **Photos stay on your server.** By default nothing is attached: emails and chats link to images that expire and can be revoked.
 - **Several families, one installation.** Anyone who can sign in to Immich sets up their own feed on a self-service page, kept fully apart from the others.
+- **Trips, too.** Next to the daily feed, a travel journal to look back on: entries written in plain Markdown files you own, their photos in Immich, and likes and comments on those photos in Immich, apart from the feed's. See [Trips](docs/journal.md).
 - **Private by design.** Self-hosted, no ads, no tracking, and narrow API keys that can't delete photos.
 
 ## Quick start: share with your family
@@ -54,4 +55,5 @@ Optional: `docker compose --profile whatsapp up -d` for WhatsApp, `--profile sig
 
 - [How it works](docs/how-it-works.md): data model, magic links, group chats, what gets sent, privacy
 - [Setting up a family feed](docs/families.md): setup page, relatives, co-parents, chats
+- [Trips](docs/journal.md): the travel journal, its Markdown files and Immich albums
 - [Hosting](docs/hosting.md): installation, OIDC, messenger gateways, admin commands, container image

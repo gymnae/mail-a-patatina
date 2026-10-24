@@ -16,7 +16,7 @@
   <header class="top">
     <a class="brand" href="{{ base }}/"><img src="/static/favicon.svg" alt="" width="36" height="36">{{ site_title }}</a>
     {% block nav %}{% if viewer %}
-    <nav><a href="{{ base }}/">{{ _("Feed") }}</a><a href="{{ base }}/calendar">{{ _("Calendar") }}</a></nav>
+    <nav><a href="{{ base }}/">{{ _("Feed") }}</a><a href="{{ base }}/calendar">{{ _("Calendar") }}</a>{% if has_trips %}<a href="{{ base }}/trips/">{{ _("Trips") }}</a>{% endif %}</nav>
     {% endif %}{% endblock %}
   </header>
   <main>{% block main %}{% endblock %}</main>

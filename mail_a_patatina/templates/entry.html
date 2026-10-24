@@ -1,18 +1,19 @@
 {% extends "base.html" %}
 {% block title %}{{ entry.caption or _("A moment") }} · {{ site_title }}{% endblock %}
 {% block main %}
+{% if back %}<nav class="pager back"><a href="{{ back[0] }}">← {{ back[1] }}</a></nav>{% endif %}
 <article class="moment">
   <figure>
     {% if entry.type == "VIDEO" %}
-    <video controls playsinline preload="none"{% if protect %} controlslist="nodownload"{% endif %} poster="{{ base }}/media/{{ entry.asset_id }}/preview" src="{{ base }}/video/{{ entry.asset_id }}"></video>
+    <video controls playsinline preload="none"{% if protect %} controlslist="nodownload"{% endif %} poster="{{ src }}/preview" src="{{ video_src }}"></video>
     {% elif entry.live_video_id %}
     <div class="live">
-      <img src="{{ base }}/media/{{ entry.asset_id }}/preview" alt="{{ entry.caption }}">
-      <video muted playsinline loop preload="none" src="{{ base }}/video/{{ entry.asset_id }}" aria-hidden="true"></video>
+      <img src="{{ src }}/preview" alt="{{ entry.caption }}">
+      <video muted playsinline loop preload="none" src="{{ video_src }}" aria-hidden="true"></video>
       <span class="live-badge">LIVE</span>
     </div>
     {% else %}
-    <img src="{{ base }}/media/{{ entry.asset_id }}/preview" alt="{{ entry.caption }}">
+    <img src="{{ src }}/preview" alt="{{ entry.caption }}">
     {% endif %}
   </figure>
   <p class="date">{{ entry.taken_at | nice_date }}</p>
@@ -20,7 +21,7 @@
 
   <section id="reactions" class="reactions">
     {% if can_post %}
-    <form method="post" action="{{ base }}/e/{{ entry.asset_id }}/like">
+    <form method="post" action="{{ here }}/like">
       <button class="react{% if activity.my_like_id %} mine{% endif %}" aria-pressed="{{ 'true' if activity.my_like_id else 'false' }}">{{ like }}{% if activity.likes %} {{ activity.likes | length }}{% endif %}</button>
     </form>
     {% elif activity.likes %}
@@ -35,7 +36,7 @@
       <div class="comment-head">
         <strong>{{ c.name }}</strong>
         {% if c.mine %}
-        <form method="post" action="{{ base }}/comments/{{ c.id }}/delete" class="inline"><button class="link">{{ _("delete") }}</button></form>
+        <form method="post" action="{{ comments_base }}/{{ c.id }}/delete" class="inline"><button class="link">{{ _("delete") }}</button></form>
         {% endif %}
       </div>
       <p>{{ c.body }}</p>
@@ -43,7 +44,7 @@
     {% endfor %}
 
     {% if can_post %}
-    <form method="post" action="{{ base }}/e/{{ entry.asset_id }}/comment" class="comment-form">
+    <form method="post" action="{{ here }}/comment" class="comment-form">
       {% if viewer.needs_name %}
       <input name="name" placeholder="{{ _('Your name') }}" maxlength="60" required autocomplete="name">
       {% endif %}
@@ -55,14 +56,14 @@
   </section>
 
   <nav class="pager">
-    {% if newer %}<a href="{{ base }}/e/{{ newer.asset_id }}">← {{ _("Newer") }}</a>{% else %}<span></span>{% endif %}
-    {% if older %}<a href="{{ base }}/e/{{ older.asset_id }}">{{ _("Older") }} →</a>{% endif %}
+    {% if newer %}<a href="{{ newer }}">← {{ _("Newer") }}</a>{% else %}<span></span>{% endif %}
+    {% if older %}<a href="{{ older }}">{{ _("Older") }} →</a>{% endif %}
   </nav>
 </article>
 
 {% if auto_like %}
 {# The ❤️ link in emails lands here; only this POST saves the like, so link scanners can't like for you. #}
-<form id="auto-like" method="post" action="{{ base }}/e/{{ entry.asset_id }}/like" hidden>
+<form id="auto-like" method="post" action="{{ here }}/like" hidden>
   <input type="hidden" name="mode" value="set">
 </form>
 <script>document.getElementById("auto-like").submit();</script>

@@ -63,6 +63,7 @@ class Settings:
     feeds_file: Path
     keys_file: Path
     setup_dir: Path
+    journal_dir: Path  # one folder per family (named by feed id) holding its trips as Markdown files
     oidc_issuer: str
     oidc_client_id: str
     oidc_client_secret: str
@@ -114,6 +115,7 @@ class Settings:
             feeds_file=_feeds_file(),
             keys_file=Path(env("KEYS_FILE", "/secrets/relatives.yml")),
             setup_dir=Path(env("SETUP_DIR", "/secrets/feeds")),
+            journal_dir=Path(env("JOURNAL_DIR", "/journal")),
             oidc_issuer=env("OIDC_ISSUER", "").rstrip("/"),
             oidc_client_id=env("OIDC_CLIENT_ID", ""),
             oidc_client_secret=env("OIDC_CLIENT_SECRET", ""),

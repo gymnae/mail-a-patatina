@@ -10,6 +10,7 @@ services:
       - ./data:/data # image cache only, safe to delete
       - ./config:/config:ro # feeds.yml (several families) or chats.yml (one family); contains keys, keep private
       - ./secrets:/secrets # relatives' Immich API keys, written by add-relative; back up like .env
+      - ./journal:/journal # trips as Markdown files, one folder per family (docs/journal.md); back up like Immich
     ports:
       - "8080:8080" # put your reverse proxy (with HTTPS) in front of this; Immich stays private
     # If Immich runs in another compose project on this host, join its network and

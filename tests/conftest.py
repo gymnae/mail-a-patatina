@@ -8,6 +8,7 @@ from fastapi.testclient import TestClient
 
 from mail_a_patatina import web
 from mail_a_patatina.i18n import Remembered
+from mail_a_patatina.journal import Journal
 from mail_a_patatina.library import Library
 
 
@@ -32,8 +33,8 @@ def family(settings, oma, monkeypatch, tmp_path):
 
     cfg = NS(id="falks", title="Die Falks", keep_photos_on_server=True, chats=[], bot_email="bot@x.invalid",
              smtp_from="Die Falks <f@example.com>", admin_emails=[], album_id="album")
-    feed = NS(id="falks", cfg=cfg, members={oma.id: oma}, bot=None, library=Library(), activities=no_activities,
-              by_email=lambda email: oma if email == oma.email else None)
+    feed = NS(id="falks", cfg=cfg, members={oma.id: oma}, bot=None, library=Library(), journal=Journal(None),
+              activities=no_activities, by_email=lambda email: oma if email == oma.email else None)
     saved, sent = [], []
 
     async def send(_settings, msg):

@@ -3,6 +3,7 @@ the audience (album members), likes and comments, and what was already sent (ass
 
 from __future__ import annotations
 
+import time
 from collections.abc import AsyncIterator
 
 import httpx
@@ -244,3 +245,23 @@ class Immich:
 
     async def admin_update_user(self, user_id: str, **fields) -> dict:
         return await self._call("PUT", f"/admin/users/{user_id}", json=fields)
+
+
+ACTIVITY_TTL = 15  # seconds; likes and comments are re-read from Immich this often at most
+
+
+class AlbumActivity:
+    """An album's likes and comments, read through `immich` and cached for a few seconds."""
+
+    def __init__(self, immich: Immich, album_id: str):
+        self.immich = immich
+        self.album_id = album_id
+        self._cached: tuple[float, list[dict]] | None = None
+
+    async def get(self) -> list[dict]:
+        if self._cached is None or time.monotonic() - self._cached[0] > ACTIVITY_TTL:
+            self._cached = (time.monotonic(), await self.immich.activities(self.album_id))
+        return self._cached[1]
+
+    def changed(self) -> None:
+        self._cached = None

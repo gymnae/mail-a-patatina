@@ -7,7 +7,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import time
 
 import httpx
 
@@ -16,15 +15,14 @@ from apscheduler.triggers.cron import CronTrigger
 
 from .config import FeedConfig, Settings, clean_email, feed_config, load_feeds
 from .i18n import Remembered
-from .immich import Immich
+from .immich import AlbumActivity, Immich
+from .journal import Journal
 from .library import Library
 from .media import MediaCache
 from .people import Member, People
 from .store import FeedStore
 
 log = logging.getLogger(__name__)
-
-ACTIVITY_TTL = 15  # seconds; likes and comments are re-read from Immich this often at most
 
 
 class Feed:
@@ -43,7 +41,8 @@ class Feed:
         self.refused_keys = 0  # co-parent keys Immich no longer accepts
         self.unkeyed: set[str] = set()  # users with photos in the album but no key here (co-parents to add)
         self.lock = asyncio.Lock()  # this feed's sync and dispatch never overlap
-        self._activities: tuple[float, list[dict]] | None = None
+        self._activity = AlbumActivity(self.curator, cfg.album_id)
+        self.journal = Journal(core.settings.journal_dir / cfg.id)  # its trips, if the family has a folder there
 
     @property
     def bot(self) -> Member | None:
@@ -92,6 +91,10 @@ class Feed:
     async def sync(self) -> None:
         async with self.lock:
             await sync.run(self)
+            try:
+                await self.journal.refresh(self)
+            except Exception:
+                log.exception("Feed %s: reading its journal failed", self.id)
 
     async def dispatch(self) -> None:
         async with self.lock:
@@ -100,12 +103,10 @@ class Feed:
             await dispatch.run(self)
 
     async def activities(self) -> list[dict]:
-        if self._activities is None or time.monotonic() - self._activities[0] > ACTIVITY_TTL:
-            self._activities = (time.monotonic(), await self.curator.activities(self.cfg.album_id))
-        return self._activities[1]
+        return await self._activity.get()
 
     def activities_changed(self) -> None:
-        self._activities = None
+        self._activity.changed()
 
     async def notify_admins(self, subject: str, body: str) -> None:
         s = self.core.settings

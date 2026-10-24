@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}{{ post.title or (post.when | nice_date) }} · {{ trip.title }}{% endblock %}
+{% block main %}
+<nav class="pager back"><a href="{{ base }}/trips/{{ trip.slug }}/">← {{ trip.title }}</a></nav>
+<article class="post">
+  <p class="date">{{ post.when | nice_date }}{% if post.place %} · {{ post.place }}{% endif %}</p>
+  {% if post.title %}<h1 class="page-title">{{ post.title }}</h1>{% endif %}
+  {% for kind, block in post.blocks %}
+  {% if kind == "text" %}
+  <div class="prose">{{ block | safe }}</div>
+  {% else %}
+  <div class="gallery{% if block | length > 1 %} several{% endif %}">
+    {% for m in block %}
+    {% set here = base ~ "/trips/" ~ trip.slug ~ "/" ~ post.slug ~ "/" ~ m.asset_id %}
+    {% set a = reactions[m.asset_id] %}
+    <figure id="m-{{ m.asset_id }}">
+      {% if m.type == "VIDEO" %}
+      <video controls playsinline preload="none"{% if protect %} controlslist="nodownload"{% endif %} poster="{{ here }}/preview" src="{{ here }}/video"></video>
+      {% elif m.live_video_id %}
+      <a class="live" href="{{ here }}">
+        <img src="{{ here }}/preview" alt="{{ m.caption }}" loading="lazy">
+        <video muted playsinline loop preload="none" src="{{ here }}/video" aria-hidden="true"></video>
+        <span class="live-badge">LIVE</span>
+      </a>
+      {% else %}
+      <a href="{{ here }}"><img src="{{ here }}/preview" alt="{{ m.caption }}" loading="lazy"></a>
+      {% endif %}
+      {% if m.caption %}<figcaption>{{ m.caption }}</figcaption>{% endif %}
+      <div class="photo-reactions">
+        {% if can_post %}
+        <form method="post" action="{{ here }}/like">
+          <input type="hidden" name="back" value="post">
+          <button class="react small{% if a.my_like_id %} mine{% endif %}" aria-pressed="{{ 'true' if a.my_like_id else 'false' }}">{{ like }}{% if a.likes %} {{ a.likes | length }}{% endif %}</button>
+        </form>
+        {% elif a.likes %}
+        <span class="react static small">{{ like }} {{ a.likes | length }}</span>
+        {% endif %}
+        <a href="{{ here }}#comments">💬 {{ a.comments | length }}</a>
+      </div>
+    </figure>
+    {% endfor %}
+  </div>
+  {% endif %}
+  {% endfor %}
+</article>
+<nav class="pager">
+  {% if earlier %}<a href="{{ base }}/trips/{{ trip.slug }}/{{ earlier.slug }}">← {{ earlier.title or (earlier.when | nice_date) }}</a>{% else %}<span></span>{% endif %}
+  {% if later %}<a href="{{ base }}/trips/{{ trip.slug }}/{{ later.slug }}">{{ later.title or (later.when | nice_date) }} →</a>{% endif %}
+</nav>
+{% endblock %}

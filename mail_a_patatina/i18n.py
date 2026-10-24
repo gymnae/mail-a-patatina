@@ -167,6 +167,18 @@ _TEXTS: dict[str, tuple[str, str, str, str, str]] = {  # English: (German, Frenc
         "Kalenteri",
         "Календарь",
         "Календар"),
+    "Trips": (
+        "Reisen",
+        "Voyages",
+        "Matkat",
+        "Путешествия",
+        "Подорожі"),
+    "No trips shared yet.": (
+        "Noch keine Reisen geteilt.",
+        "Aucun voyage partagé pour l'instant.",
+        "Matkoja ei ole vielä jaettu.",
+        "Пока нет опубликованных путешествий.",
+        "Поки немає опублікованих подорожей."),
     "Not {name}?": (
         "Nicht {name}?",
         "Vous n'êtes pas {name} ?",

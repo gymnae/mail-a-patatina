@@ -1,4 +1,4 @@
-"""The viewer website: magic-link login, feed, calendar, and one page per moment.
+"""The viewer website: magic-link login, feed, calendar, one page per moment, and the family's trips.
 Likes and comments are read from and written to Immich, as the signed-in relative.
 
 Every page lives under /<feed id>/, its sign-in cookie is limited to that path, and every request is
@@ -30,6 +30,7 @@ from .core import Core, Feed
 from .i18n import from_header, install
 from .i18n import t as translate  # `t` is the magic-link parameter here
 from .immich import LoginFailed
+from .journal import Media, Post, Trip
 from .library import Entry, now
 from .links import LIKE, make_session, make_token, read_photo_ticket, read_session, read_token
 from .people import Member
@@ -251,6 +252,7 @@ def render(request: Request, template: str, viewer: Viewer | None, status: int =
         "viewer": viewer, "like": LIKE,
         "site_title": feed.cfg.title if feed else "Mail-A-Patatina",
         "base": f"/{feed.id}" if feed else "",
+        "has_trips": bool(viewer and viewer.feed.journal.visible_to(viewer.account)),
         # A family that keeps its photos on the server also doesn't want them saved from the pages with one tap.
         "protect": bool(feed and feed.cfg.keep_photos_on_server),
     }
@@ -379,23 +381,57 @@ async def entry_page(request: Request, feed_id: str, asset_id: str, like: str | 
     newer, older = feed.library.neighbours(entry)
     activity = _for_asset(feed, await feed.activities(), asset_id, viewer)
     can_post = viewer.account is not None
+    base = f"/{feed.id}"
     return render(
-        request, "entry.html", viewer, entry=entry, activity=activity, newer=newer, older=older, can_post=can_post,
+        request, "entry.html", viewer, entry=entry, activity=activity, can_post=can_post,
         auto_like=bool(like) and can_post and activity.my_like_id is None,
+        here=f"{base}/e/{asset_id}", src=f"{base}/media/{asset_id}", video_src=f"{base}/video/{asset_id}",
+        comments_base=f"{base}/comments", newer=newer and f"{base}/e/{newer.asset_id}",
+        older=older and f"{base}/e/{older.asset_id}",
     )
+
+
+async def _toggle_like(viewer: Viewer, album_id: str, asset_id: str, mode: str) -> None:
+    feed, account = viewer.feed, require_account(viewer)
+    current = _for_asset(feed, await feed.curator.activities(album_id), asset_id, viewer).my_like_id
+    if current is None:
+        await core.people.run_as(account, lambda c: c.add_activity(album_id, asset_id, "like"))
+    elif mode == "toggle" and not viewer.is_guest:  # a group's shared like isn't one visitor's to take back
+        await core.people.run_as(account, lambda c: c.delete_activity(current))
+
+
+async def _comment(viewer: Viewer, response: Response, album_id: str, asset_id: str, body: str, name: str) -> str:
+    """Posts the comment as the viewer; -> what they wrote ("" if nothing)."""
+    feed, account = viewer.feed, require_account(viewer)
+    body = body.strip()[:2000]
+    if viewer.needs_name and name.strip():
+        viewer.guest_name = name.strip().replace("]", ")")[:60]
+        set_cookie(response, feed, GUEST_NAME_COOKIE, quote(viewer.guest_name))
+    if not body:
+        return ""
+    text = f"[{viewer.guest_name or 'Guest'}] {body}" if viewer.is_guest else body
+    await core.people.run_as(account, lambda c: c.add_activity(album_id, asset_id, "comment", text))
+    return body
+
+
+async def _delete_comment(viewer: Viewer, album_id: str, activity_id: str) -> dict:
+    """Deletes one of the viewer's own comments; -> the comment as it was."""
+    feed, account = viewer.feed, require_account(viewer)
+    if viewer.is_guest:
+        raise HTTPException(403)
+    activity = next((a for a in await feed.curator.activities(album_id) if a["id"] == activity_id), None)
+    if activity is None or activity["user"]["id"] != account.id:
+        raise HTTPException(404)
+    await core.people.run_as(account, lambda c: c.delete_activity(activity_id))
+    return activity
 
 
 @app.post("/{feed_id}/e/{asset_id}/like")
 async def toggle_like(request: Request, feed_id: str, asset_id: str, mode: str = Form("toggle")):
     viewer = require_viewer(request, feed_id)
-    feed, account = viewer.feed, require_account(viewer)
+    feed = viewer.feed
     shared_entry(feed, asset_id)
-    album = feed.cfg.album_id
-    current = _for_asset(feed, await feed.curator.activities(album), asset_id, viewer).my_like_id
-    if current is None:
-        await core.people.run_as(account, lambda c: c.add_activity(album, asset_id, "like"))
-    elif mode == "toggle" and not viewer.is_guest:  # a group's shared like isn't one visitor's to take back
-        await core.people.run_as(account, lambda c: c.delete_activity(current))
+    await _toggle_like(viewer, feed.cfg.album_id, asset_id, mode)
     feed.activities_changed()
     return RedirectResponse(f"/{feed.id}/e/{asset_id}#reactions", status_code=303)
 
@@ -406,17 +442,12 @@ async def comment(
     name: str = Form(""),
 ):
     viewer = require_viewer(request, feed_id)
-    feed, account = viewer.feed, require_account(viewer)
+    feed = viewer.feed
     entry = shared_entry(feed, asset_id)
-    body = body.strip()[:2000]
     response = RedirectResponse(f"/{feed.id}/e/{asset_id}#comments", status_code=303)
-    if viewer.needs_name and name.strip():
-        viewer.guest_name = name.strip().replace("]", ")")[:60]
-        set_cookie(response, feed, GUEST_NAME_COOKIE, quote(viewer.guest_name))
+    body = await _comment(viewer, response, feed.cfg.album_id, asset_id, body, name)
     if not body:
         return response
-    text = f"[{viewer.guest_name or 'Guest'}] {body}" if viewer.is_guest else body
-    await core.people.run_as(account, lambda c: c.add_activity(feed.cfg.album_id, asset_id, "comment", text))
     feed.activities_changed()
     who = viewer.name or "Someone"
     background.add_task(
@@ -430,13 +461,8 @@ async def comment(
 @app.post("/{feed_id}/comments/{activity_id}/delete")
 async def delete_comment(request: Request, feed_id: str, activity_id: str):
     viewer = require_viewer(request, feed_id)
-    feed, account = viewer.feed, require_account(viewer)
-    if viewer.is_guest:
-        raise HTTPException(403)
-    activity = next((a for a in await feed.curator.activities(feed.cfg.album_id) if a["id"] == activity_id), None)
-    if activity is None or activity["user"]["id"] != account.id:
-        raise HTTPException(404)
-    await core.people.run_as(account, lambda c: c.delete_activity(activity_id))
+    feed = viewer.feed
+    activity = await _delete_comment(viewer, feed.cfg.album_id, activity_id)
     feed.activities_changed()
     return RedirectResponse(f"/{feed.id}/e/{activity['assetId']}#comments", status_code=303)
 
@@ -471,9 +497,12 @@ async def emailed_photo(feed_id: str, asset_id: str, ticket: str):
 @app.get("/{feed_id}/video/{asset_id}")
 async def video(request: Request, feed_id: str, asset_id: str):
     feed = require_viewer(request, feed_id).feed
-    entry = shared_entry(feed, asset_id)
+    return await _stream_video(request, feed, shared_entry(feed, asset_id))
+
+
+async def _stream_video(request: Request, feed: Feed, item: Entry | Media) -> StreamingResponse:
     # A video, or the motion part of a live photo (a hidden asset, so never looked up by its own id).
-    video_id = entry.asset_id if entry.type == "VIDEO" else entry.live_video_id
+    video_id = item.asset_id if item.type == "VIDEO" else item.live_video_id
     if not video_id:
         raise HTTPException(404)
     upstream = await feed.curator.open_video(video_id, request.headers.get("range"))
@@ -483,6 +512,129 @@ async def video(request: Request, feed_id: str, asset_id: str):
         headers={k: v for k, v in upstream.headers.items() if k.lower() in keep},
         background=BackgroundTask(upstream.aclose),
     )
+
+
+# --- trips: the family's journal. Text from Markdown files; photos, likes and comments in the trip's album ---
+
+
+def readable_trip(request: Request, feed_id: str, slug: str) -> tuple[Viewer, Trip]:
+    """A trip whose album is shared with the visitor (with the feed's bot, for visitors from a group chat).
+    Anyone else gets "not found", so they don't learn that the trip exists."""
+    viewer = require_viewer(request, feed_id)
+    trip = viewer.feed.journal.trips.get(slug)
+    if trip is None or not trip.readable_by(viewer.account):
+        raise HTTPException(404)
+    return viewer, trip
+
+
+def trip_post(request: Request, feed_id: str, slug: str, post_slug: str) -> tuple[Viewer, Trip, Post]:
+    viewer, trip = readable_trip(request, feed_id, slug)
+    post = trip.post(post_slug)
+    if post is None:
+        raise HTTPException(404)
+    return viewer, trip, post
+
+
+def trip_media(request: Request, feed_id: str, slug: str, post_slug: str, asset_id: str
+               ) -> tuple[Viewer, Trip, Post, Media]:
+    """A photo as part of an entry: only what an entry shows can be opened, liked or commented on."""
+    viewer, trip, post = trip_post(request, feed_id, slug, post_slug)
+    media = next((m for m in post.media if m.asset_id == asset_id), None)
+    if media is None:
+        raise HTTPException(404)
+    return viewer, trip, post, media
+
+
+@app.get("/{feed_id}/trips/", response_class=HTMLResponse)
+async def trips_page(request: Request, feed_id: str):
+    viewer = require_viewer(request, feed_id)
+    return render(request, "trips.html", viewer, trips=viewer.feed.journal.visible_to(viewer.account))
+
+
+@app.get("/{feed_id}/trips/{slug}", include_in_schema=False)
+async def trip_without_slash(request: Request, feed_id: str, slug: str):
+    readable_trip(request, feed_id, slug)
+    return RedirectResponse(f"/{feed_id}/trips/{slug}/", status_code=308)
+
+
+@app.get("/{feed_id}/trips/{slug}/", response_class=HTMLResponse)
+async def trip_page(request: Request, feed_id: str, slug: str):
+    viewer, trip = readable_trip(request, feed_id, slug)
+    return render(request, "trip.html", viewer, trip=trip)
+
+
+@app.get("/{feed_id}/trips/{slug}/{post_slug}", response_class=HTMLResponse)
+async def trip_post_page(request: Request, feed_id: str, slug: str, post_slug: str):
+    viewer, trip, post = trip_post(request, feed_id, slug, post_slug)
+    activities = await trip.activity.get()
+    reactions = {m.asset_id: _for_asset(viewer.feed, activities, m.asset_id, viewer) for m in post.media}
+    earlier, later = trip.neighbours(post)
+    return render(request, "trip_post.html", viewer, trip=trip, post=post, reactions=reactions, earlier=earlier,
+                  later=later, can_post=viewer.account is not None)
+
+
+@app.get("/{feed_id}/trips/{slug}/{post_slug}/{asset_id}", response_class=HTMLResponse)
+async def trip_media_page(request: Request, feed_id: str, slug: str, post_slug: str, asset_id: str):
+    viewer, trip, post, media = trip_media(request, feed_id, slug, post_slug, asset_id)
+    post_url = f"/{feed_id}/trips/{slug}/{post_slug}"
+    here = f"{post_url}/{asset_id}"
+    activity = _for_asset(viewer.feed, await trip.activity.get(), asset_id, viewer)
+    return render(
+        request, "entry.html", viewer, entry=media, activity=activity, can_post=viewer.account is not None,
+        here=here, src=here, video_src=f"{here}/video",
+        comments_base=f"{here}/comments", back=(post_url, post.title or trip.title),
+    )
+
+
+@app.post("/{feed_id}/trips/{slug}/{post_slug}/{asset_id}/like")
+async def trip_like(request: Request, feed_id: str, slug: str, post_slug: str, asset_id: str,
+                    mode: str = Form("toggle"), back: str = Form("")):
+    viewer, trip, _, _ = trip_media(request, feed_id, slug, post_slug, asset_id)
+    await _toggle_like(viewer, trip.album_id, asset_id, mode)
+    trip.activity.changed()
+    post_url = f"/{feed_id}/trips/{slug}/{post_slug}"
+    # Liked right in the entry: back to the same photo there.
+    target = f"{post_url}#m-{asset_id}" if back == "post" else f"{post_url}/{asset_id}#reactions"
+    return RedirectResponse(target, status_code=303)
+
+
+@app.post("/{feed_id}/trips/{slug}/{post_slug}/{asset_id}/comment")
+async def trip_comment(request: Request, background: BackgroundTasks, feed_id: str, slug: str, post_slug: str,
+                       asset_id: str, body: str = Form(), name: str = Form("")):
+    viewer, trip, post, _ = trip_media(request, feed_id, slug, post_slug, asset_id)
+    here = f"/{feed_id}/trips/{slug}/{post_slug}/{asset_id}"
+    response = RedirectResponse(f"{here}#comments", status_code=303)
+    body = await _comment(viewer, response, trip.album_id, asset_id, body, name)
+    if not body:
+        return response
+    trip.activity.changed()
+    who = viewer.name or "Someone"
+    background.add_task(
+        viewer.feed.notify_admins,
+        f"{trip.title}: {who} commented",
+        f"{who} on a photo in “{post.title or post.day}”:\n\n{body}\n\n{core.settings.public_url}{here}",
+    )
+    return response
+
+
+@app.post("/{feed_id}/trips/{slug}/{post_slug}/{asset_id}/comments/{activity_id}/delete")
+async def trip_delete_comment(request: Request, feed_id: str, slug: str, post_slug: str, asset_id: str,
+                              activity_id: str):
+    viewer, trip, _, _ = trip_media(request, feed_id, slug, post_slug, asset_id)
+    await _delete_comment(viewer, trip.album_id, activity_id)
+    trip.activity.changed()
+    return RedirectResponse(f"/{feed_id}/trips/{slug}/{post_slug}/{asset_id}#comments", status_code=303)
+
+
+@app.get("/{feed_id}/trips/{slug}/{post_slug}/{asset_id}/{size}")
+async def trip_media_file(request: Request, feed_id: str, slug: str, post_slug: str, asset_id: str, size: str):
+    viewer, _, _, media = trip_media(request, feed_id, slug, post_slug, asset_id)
+    if size == "video":
+        return await _stream_video(request, viewer.feed, media)
+    if size not in ("thumb", "preview"):
+        raise HTTPException(404)
+    data = await core.media.jpeg(viewer.feed.curator, asset_id, size)
+    return Response(data, media_type="image/jpeg", headers={"Cache-Control": "private, max-age=86400"})
 
 
 # --- unsubscribe (one-click capable, RFC 8058) — stored as the member's Immich email preference ---
