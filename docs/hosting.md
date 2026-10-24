@@ -88,7 +88,7 @@ Tests need neither Immich nor SMTP: `pip install -r requirements-dev.txt`, then 
 
 ## Keep in mind
 
-- **Back up `./journal` like Immich.** It holds the trips' text (see [Trips](journal.md)); nothing else has a copy.
+- **Back up `./journal` like Immich.** It holds the trips' text (see [Trips](journal.md)); nothing else has a copy. The container writes it as user 1000: if Docker created the folder, `sudo chown 1000 journal` once.
 - **Back up `./secrets` like `.env`.** If the keys are lost, run `add-relative` again for each relative, with password login switched on for a moment. You can see and revoke each key in Immich under the relative's account (*API keys → Mail-A-Patatina*).
 - **`SECRET_KEY`:** it signs the magic links. It also derives the relatives' passwords, which are only used while `add-relative` runs. If you change it, `add-relative` needs `--adopt` for existing relatives.
 - **Immich's own emails:** if Immich's own SMTP is set up, it may still email album *invites*. `add-relative` turns off album update emails for managed accounts, and invites aren't sent because accounts are created with `notify: false`.

@@ -1,0 +1,34 @@
+{% extends "setup/layout.html" %}
+{% block page_title %}{{ _("New trip") }}{% endblock %}
+{% block nav %}{% include "setup/write_nav.html" %}{% endblock %}
+{% block content %}
+<p class="back"><a href="/setup/f/{{ raw.id }}/trips/">← {{ _("Trips") }}</a></p>
+<h1>{{ _("New trip") }}</h1>
+{% include "setup/write_permissions.html" %}
+<form method="post" action="/setup/f/{{ raw.id }}/trips/new" class="stack">
+  <input type="hidden" name="csrf" value="{{ session.csrf }}">
+  <label>{{ _("What should the trip be called?") }}
+    <input name="title" required maxlength="80" placeholder="{{ _('e.g. Summer in Lapland 2026') }}" autofocus></label>
+  <fieldset>
+    <legend>{{ _("Who may read it?") }}</legend>
+    {% for r in readers %}
+    <label class="choice"><input type="checkbox" name="reader" value="{{ r.id }}" checked>
+      {{ r.name or _("Your group chats ({names})", names=r.chats | join(", ")) }}</label>
+    {% else %}
+    <p class="hint">{{ _("Nobody yet: add relatives on the settings page first.") }}</p>
+    {% endfor %}
+  </fieldset>
+  <p class="hint">{{ _("An album for the trip is made in Immich and shared with them. The photos you put in its entries are added to it.") }}</p>
+  {% if albums %}
+  <details>
+    <summary>{{ _("Already made an album for this trip in Immich?") }}</summary>
+    <label>{{ _("Use this album") }}
+      <select name="album_id">
+        <option value="">{{ _("No, make a new one") }}</option>
+        {% for a in albums %}<option value="{{ a.id }}">{{ a.albumName }}</option>{% endfor %}
+      </select></label>
+  </details>
+  {% endif %}
+  <button class="primary big"{% if missing %} disabled{% endif %}>{{ _("Start the trip") }}</button>
+</form>
+{% endblock %}

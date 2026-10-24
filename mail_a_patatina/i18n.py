@@ -781,6 +781,332 @@ _TEXTS: dict[str, tuple[str, str, str, str, str]] = {  # English: (German, Frenc
         "Saat ”{title}” sähköpostiisi ja voit tykätä jokaisesta kuvasta ja kommentoida sitä.",
         "Вы будете получать «{title}» по почте и сможете отмечать «нравится» и комментировать каждое фото.",
         "Ви отримуватимете «{title}» поштою й зможете вподобати та прокоментувати кожне фото."),
+    # the journal editor (setup page, in the writer's language)
+    "Settings": ("Einstellungen", "Paramètres", "Asetukset", "Настройки", "Налаштування"),
+    "Sign out": ("Abmelden", "Se déconnecter", "Kirjaudu ulos", "Выйти", "Вийти"),
+    "New trip": ("Neue Reise", "Nouveau voyage", "Uusi matka", "Новое путешествие", "Нова подорож"),
+    "Entries: {n}": ("Einträge: {n}", "Récits : {n}", "Kirjoituksia: {n}", "Записей: {n}", "Записів: {n}"),
+    "Drafts: {n}": ("Entwürfe: {n}", "Brouillons : {n}", "Luonnoksia: {n}", "Черновиков: {n}", "Чернеток: {n}"),
+    "No trips yet. Start one for your next holiday, or for one you'd like to remember.": (
+        "Noch keine Reisen. Fang eine für euren nächsten Urlaub an, oder für einen, an den ihr euch erinnern wollt.",
+        "Pas encore de voyage. Commencez-en un pour vos prochaines vacances, ou pour celles dont vous voulez garder "
+        "le souvenir.",
+        "Ei vielä matkoja. Aloita sellainen seuraavasta lomastanne tai lomasta, jonka haluatte muistaa.",
+        "Путешествий пока нет. Начните новое — о ближайшем отпуске или о том, который хочется запомнить.",
+        "Подорожей поки немає. Почніть нову — про найближчу відпустку або про ту, яку хочеться запам’ятати."),
+    "Before you start a trip, Mail-A-Patatina needs to be allowed to make albums in Immich and add photos to them.": (
+        "Bevor du eine Reise anfängst, muss Mail-A-Patatina in Immich Alben anlegen und Fotos hinzufügen dürfen.",
+        "Avant de commencer un voyage, Mail-A-Patatina doit avoir le droit de créer des albums dans Immich et d'y "
+        "ajouter des photos.",
+        "Ennen kuin aloitat matkan, Mail-A-Patatinalla täytyy olla lupa luoda albumeja Immichiin ja lisätä niihin "
+        "kuvia.",
+        "Прежде чем начать путешествие, Mail-A-Patatina нужно разрешить создавать альбомы в Immich и добавлять в "
+        "них фото.",
+        "Перш ніж почати подорож, Mail-A-Patatina треба дозволити створювати альбоми в Immich і додавати до них "
+        "фото."),
+    "Allow it: connect with Immich again": (
+        "Erlauben: noch einmal mit Immich verbinden",
+        "Autoriser : se reconnecter à Immich",
+        "Salli: yhdistä Immichiin uudelleen",
+        "Разрешить: снова подключить Immich",
+        "Дозволити: знову підключити Immich"),
+    "Afterwards, come back here through Trips.": (
+        "Komm danach über „Reisen“ hierher zurück.",
+        "Revenez ensuite ici par « Voyages ».",
+        "Palaa sen jälkeen tänne kohdasta ”Matkat”.",
+        "Потом вернитесь сюда через «Путешествия».",
+        "Потім поверніться сюди через «Подорожі»."),
+    "Whoever set up the feed can do this on the settings page, under “Immich key”, with a new key that also has "
+    "these permissions:": (
+        "Wer die Momente eingerichtet hat, kann das in den Einstellungen unter „Immich key“ erledigen, mit einem "
+        "neuen Schlüssel, der auch diese Berechtigungen hat:",
+        "La personne qui a configuré le fil peut le faire dans les paramètres, sous « Immich key », avec une "
+        "nouvelle clé qui a aussi ces autorisations :",
+        "Syötteen määrittänyt henkilö voi tehdä tämän asetuksissa kohdassa ”Immich key” uudella avaimella, jolla on "
+        "myös nämä oikeudet:",
+        "Тот, кто настраивал ленту, может сделать это в настройках, в разделе «Immich key», с новым ключом, у "
+        "которого есть и эти права:",
+        "Той, хто налаштовував стрічку, може зробити це в налаштуваннях, у розділі «Immich key», з новим ключем, "
+        "який має й ці дозволи:"),
+    "What should the trip be called?": (
+        "Wie soll die Reise heißen?",
+        "Comment s'appelle ce voyage ?",
+        "Mikä matkan nimi on?",
+        "Как назвать путешествие?",
+        "Як назвати подорож?"),
+    "e.g. Summer in Lapland 2026": (
+        "z. B. Sommer in Lappland 2026",
+        "p. ex. Été en Laponie 2026",
+        "esim. Kesä Lapissa 2026",
+        "например, Лето в Лапландии 2026",
+        "наприклад, Літо в Лапландії 2026"),
+    "Who may read it?": (
+        "Wer darf sie lesen?",
+        "Qui peut le lire ?",
+        "Kuka saa lukea sen?",
+        "Кто может его читать?",
+        "Хто може її читати?"),
+    "Your group chats ({names})": (
+        "Eure Gruppenchats ({names})",
+        "Vos discussions de groupe ({names})",
+        "Ryhmäkeskustelunne ({names})",
+        "Ваши групповые чаты ({names})",
+        "Ваші групові чати ({names})"),
+    "Nobody yet: add relatives on the settings page first.": (
+        "Noch niemand: füge zuerst in den Einstellungen Verwandte hinzu.",
+        "Personne pour l'instant : ajoutez d'abord des proches dans les paramètres.",
+        "Ei vielä ketään: lisää ensin sukulaisia asetuksissa.",
+        "Пока никого: сначала добавьте родственников в настройках.",
+        "Поки нікого: спершу додайте родичів у налаштуваннях."),
+    "An album for the trip is made in Immich and shared with them. The photos you put in its entries are added "
+    "to it.": (
+        "In Immich wird ein Album für die Reise angelegt und mit ihnen geteilt. Die Fotos aus deinen Einträgen "
+        "kommen dort hinein.",
+        "Un album est créé pour ce voyage dans Immich et partagé avec eux. Les photos de vos récits y sont "
+        "ajoutées.",
+        "Matkalle luodaan Immichiin albumi, joka jaetaan heille. Kirjoitustesi kuvat lisätään siihen.",
+        "В Immich создаётся альбом путешествия, и он открывается для них. Фото из ваших записей добавляются туда.",
+        "В Immich створюється альбом подорожі, і він відкривається для них. Фото з ваших записів додаються туди."),
+    "Already made an album for this trip in Immich?": (
+        "Schon ein Album für diese Reise in Immich angelegt?",
+        "Vous avez déjà un album pour ce voyage dans Immich ?",
+        "Onko sinulla jo albumi tälle matkalle Immichissä?",
+        "Уже есть альбом для этого путешествия в Immich?",
+        "Уже є альбом для цієї подорожі в Immich?"),
+    "Use this album": (
+        "Dieses Album verwenden",
+        "Utiliser cet album",
+        "Käytä tätä albumia",
+        "Использовать этот альбом",
+        "Використати цей альбом"),
+    "No, make a new one": (
+        "Nein, ein neues anlegen",
+        "Non, en créer un nouveau",
+        "Ei, luo uusi",
+        "Нет, создать новый",
+        "Ні, створити новий"),
+    "Start the trip": (
+        "Reise anfangen",
+        "Commencer le voyage",
+        "Aloita matka",
+        "Начать путешествие",
+        "Почати подорож"),
+    "Give the trip a name.": (
+        "Gib der Reise einen Namen.",
+        "Donnez un nom au voyage.",
+        "Anna matkalle nimi.",
+        "Дайте путешествию название.",
+        "Дайте подорожі назву."),
+    "The server can't save files in the journal folder. Ask whoever runs Mail-A-Patatina to fix that.": (
+        "Der Server kann im Reise-Ordner nichts speichern. Bitte die Person, die Mail-A-Patatina betreibt, das zu "
+        "beheben.",
+        "Le serveur ne peut pas enregistrer de fichiers dans le dossier du journal. Demandez à la personne qui gère "
+        "Mail-A-Patatina de corriger cela.",
+        "Palvelin ei voi tallentaa tiedostoja matkakansioon. Pyydä Mail-A-Patatinan ylläpitäjää korjaamaan tämä.",
+        "Сервер не может сохранять файлы в папке путешествий. Попросите того, кто обслуживает Mail-A-Patatina, "
+        "это исправить.",
+        "Сервер не може зберігати файли в теці подорожей. Попросіть того, хто обслуговує Mail-A-Patatina, це "
+        "виправити."),
+    "New entry": ("Neuer Eintrag", "Nouveau récit", "Uusi kirjoitus", "Новая запись", "Новий запис"),
+    "Untitled": ("Ohne Titel", "Sans titre", "Nimetön", "Без названия", "Без назви"),
+    "Draft": ("Entwurf", "Brouillon", "Luonnos", "Черновик", "Чернетка"),
+    "No entries yet.": (
+        "Noch keine Einträge.",
+        "Pas encore de récit.",
+        "Ei vielä kirjoituksia.",
+        "Записей пока нет.",
+        "Записів поки немає."),
+    "Trip settings": (
+        "Einstellungen der Reise",
+        "Paramètres du voyage",
+        "Matkan asetukset",
+        "Настройки путешествия",
+        "Налаштування подорожі"),
+    "Name": ("Name", "Nom", "Nimi", "Название", "Назва"),
+    "Also shared in Immich with: {names}": (
+        "In Immich außerdem geteilt mit: {names}",
+        "Également partagé dans Immich avec : {names}",
+        "Jaettu Immichissä myös: {names}",
+        "В Immich также открыт для: {names}",
+        "В Immich також відкрито для: {names}"),
+    "Save": ("Speichern", "Enregistrer", "Tallenna", "Сохранить", "Зберегти"),
+    "Saved.": ("Gespeichert.", "Enregistré.", "Tallennettu.", "Сохранено.", "Збережено."),
+    "Title (optional)": (
+        "Titel (freiwillig)",
+        "Titre (facultatif)",
+        "Otsikko (vapaaehtoinen)",
+        "Заголовок (необязательно)",
+        "Заголовок (необов’язково)"),
+    "Date": ("Datum", "Date", "Päivä", "Дата", "Дата"),
+    "Place": ("Ort", "Lieu", "Paikka", "Место", "Місце"),
+    "Where were you?": ("Wo wart ihr?", "Où étiez-vous ?", "Missä olitte?", "Где вы были?", "Де ви були?"),
+    "Text": ("Text", "Texte", "Tekstiä", "Текст", "Текст"),
+    "Photos": ("Fotos", "Photos", "Kuvia", "Фото", "Фото"),
+    "Delete this entry": (
+        "Diesen Eintrag löschen",
+        "Supprimer ce récit",
+        "Poista tämä kirjoitus",
+        "Удалить эту запись",
+        "Видалити цей запис"),
+    "Delete this entry? Its photos stay in Immich.": (
+        "Diesen Eintrag löschen? Die Fotos bleiben in Immich.",
+        "Supprimer ce récit ? Ses photos restent dans Immich.",
+        "Poistetaanko tämä kirjoitus? Sen kuvat jäävät Immichiin.",
+        "Удалить эту запись? Фото останутся в Immich.",
+        "Видалити цей запис? Фото залишаться в Immich."),
+    "The entry is deleted.": (
+        "Der Eintrag ist gelöscht.",
+        "Le récit est supprimé.",
+        "Kirjoitus on poistettu.",
+        "Запись удалена.",
+        "Запис видалено."),
+    "Pick photos": ("Fotos auswählen", "Choisir des photos", "Valitse kuvia", "Выбрать фото", "Вибрати фото"),
+    "That day": ("An dem Tag", "Ce jour-là", "Sinä päivänä", "В тот день", "Того дня"),
+    "Recent": ("Neueste", "Récentes", "Uusimmat", "Последние", "Останні"),
+    "Album": ("Album", "Album", "Albumi", "Альбом", "Альбом"),
+    "Close": ("Schließen", "Fermer", "Sulje", "Закрыть", "Закрити"),
+    "Photos taken on": ("Fotos vom", "Photos prises le", "Kuvat päivältä", "Фото за", "Фото за"),
+    "Photos show up here once the Immich app on your phone has backed them up.": (
+        "Fotos erscheinen hier, sobald die Immich-App auf deinem Handy sie gesichert hat.",
+        "Les photos apparaissent ici dès que l'application Immich de votre téléphone les a sauvegardées.",
+        "Kuvat näkyvät täällä, kun puhelimesi Immich-sovellus on varmuuskopioinut ne.",
+        "Фото появятся здесь, как только приложение Immich на телефоне их сохранит.",
+        "Фото з’являться тут, щойно застосунок Immich на телефоні їх збереже."),
+    "Saved as a draft": (
+        "Als Entwurf gespeichert",
+        "Enregistré comme brouillon",
+        "Tallennettu luonnoksena",
+        "Сохранено как черновик",
+        "Збережено як чернетку"),
+    "Published": (
+        "Veröffentlicht",
+        "Publié",
+        "Julkaistu",
+        "Опубликовано",
+        "Опубліковано"),
+    "Saving…": ("Wird gespeichert…", "Enregistrement…", "Tallennetaan…", "Сохранение…", "Збереження…"),
+    "Not saved yet": (
+        "Noch nicht gespeichert",
+        "Pas encore enregistré",
+        "Ei vielä tallennettu",
+        "Ещё не сохранено",
+        "Ще не збережено"),
+    "Caption": ("Bildtext", "Légende", "Kuvateksti", "Подпись", "Підпис"),
+    "Remove": ("Entfernen", "Retirer", "Poista", "Убрать", "Прибрати"),
+    "Move up": ("Nach oben", "Monter", "Siirrä ylös", "Выше", "Вище"),
+    "Move down": ("Nach unten", "Descendre", "Siirrä alas", "Ниже", "Нижче"),
+    "Add more photos here": (
+        "Hier weitere Fotos hinzufügen",
+        "Ajouter d'autres photos ici",
+        "Lisää tähän kuvia",
+        "Добавить сюда ещё фото",
+        "Додати сюди ще фото"),
+    "Write here…": ("Schreib hier…", "Écrivez ici…", "Kirjoita tähän…", "Пишите здесь…", "Пишіть тут…"),
+    "Nothing found for this day.": (
+        "Für diesen Tag nichts gefunden.",
+        "Rien trouvé pour ce jour.",
+        "Tältä päivältä ei löytynyt mitään.",
+        "За этот день ничего не найдено.",
+        "За цей день нічого не знайдено."),
+    "No photos here yet.": (
+        "Hier sind noch keine Fotos.",
+        "Pas encore de photos ici.",
+        "Täällä ei ole vielä kuvia.",
+        "Здесь пока нет фото.",
+        "Тут поки немає фото."),
+    "Add photos ({n})": (
+        "Fotos hinzufügen ({n})",
+        "Ajouter les photos ({n})",
+        "Lisää kuvat ({n})",
+        "Добавить фото ({n})",
+        "Додати фото ({n})"),
+    "Show more": ("Mehr zeigen", "Afficher plus", "Näytä lisää", "Показать ещё", "Показати ще"),
+    "Publish": ("Veröffentlichen", "Publier", "Julkaise", "Опубликовать", "Опублікувати"),
+    "Save as draft": (
+        "Als Entwurf speichern",
+        "Enregistrer comme brouillon",
+        "Tallenna luonnoksena",
+        "Сохранить черновик",
+        "Зберегти чернетку"),
+    "Save changes": (
+        "Änderungen speichern",
+        "Enregistrer les modifications",
+        "Tallenna muutokset",
+        "Сохранить изменения",
+        "Зберегти зміни"),
+    "Turn back into a draft": (
+        "Zurück zum Entwurf",
+        "Repasser en brouillon",
+        "Takaisin luonnokseksi",
+        "Снова в черновик",
+        "Знову в чернетку"),
+    "Sign in again": (
+        "Neu anmelden",
+        "Se reconnecter",
+        "Kirjaudu uudelleen",
+        "Войти снова",
+        "Увійти знову"),
+    "Restore what I wrote": (
+        "Mein Geschriebenes zurückholen",
+        "Récupérer ce que j'ai écrit",
+        "Palauta kirjoittamani",
+        "Вернуть написанное",
+        "Повернути написане"),
+    "You wrote more on this device than was saved.": (
+        "Auf diesem Gerät hast du mehr geschrieben, als gespeichert wurde.",
+        "Sur cet appareil, vous avez écrit plus que ce qui a été enregistré.",
+        "Kirjoitit tällä laitteella enemmän kuin tallennettiin.",
+        "На этом устройстве вы написали больше, чем было сохранено.",
+        "На цьому пристрої ви написали більше, ніж було збережено."),
+    "Restored what you wrote on this device before.": (
+        "Was du vorher auf diesem Gerät geschrieben hast, ist wieder da.",
+        "Ce que vous aviez écrit sur cet appareil a été récupéré.",
+        "Aiemmin tällä laitteella kirjoittamasi on palautettu.",
+        "Восстановлено то, что вы раньше написали на этом устройстве.",
+        "Відновлено те, що ви раніше написали на цьому пристрої."),
+    "Loading…": ("Wird geladen…", "Chargement…", "Ladataan…", "Загрузка…", "Завантаження…"),
+    "Pick a date.": ("Wähl ein Datum.", "Choisissez une date.", "Valitse päivä.", "Выберите дату.", "Виберіть дату."),
+    "This entry was deleted in the meantime.": (
+        "Dieser Eintrag wurde inzwischen gelöscht.",
+        "Ce récit a été supprimé entre-temps.",
+        "Tämä kirjoitus on sillä välin poistettu.",
+        "Эта запись тем временем была удалена.",
+        "Цей запис тим часом видалили."),
+    "Someone else changed this entry since you opened it. Copy your text, reload the page and add it again.": (
+        "Jemand anderes hat diesen Eintrag geändert, seit du ihn geöffnet hast. Kopier deinen Text, lade die Seite "
+        "neu und füg ihn wieder ein.",
+        "Quelqu'un d'autre a modifié ce récit depuis que vous l'avez ouvert. Copiez votre texte, rechargez la page "
+        "et ajoutez-le à nouveau.",
+        "Joku muu on muuttanut tätä kirjoitusta sen jälkeen, kun avasit sen. Kopioi tekstisi, lataa sivu uudelleen "
+        "ja lisää se takaisin.",
+        "Кто-то другой изменил эту запись, пока она была открыта у вас. Скопируйте свой текст, обновите страницу и "
+        "добавьте его снова.",
+        "Хтось інший змінив цей запис, поки він був відкритий у вас. Скопіюйте свій текст, оновіть сторінку й "
+        "додайте його знову."),
+    "Mail-A-Patatina isn't allowed to add photos to albums yet. Connect it with Immich again on the trips page, "
+    "then publish again.": (
+        "Mail-A-Patatina darf noch keine Fotos zu Alben hinzufügen. Verbinde es auf der Reisen-Seite noch einmal "
+        "mit Immich und veröffentliche dann erneut.",
+        "Mail-A-Patatina n'a pas encore le droit d'ajouter des photos aux albums. Reconnectez-le à Immich sur la "
+        "page des voyages, puis publiez à nouveau.",
+        "Mail-A-Patatinalla ei ole vielä lupaa lisätä kuvia albumeihin. Yhdistä se Immichiin uudelleen "
+        "matkasivulla ja julkaise sitten uudelleen.",
+        "Mail-A-Patatina пока не может добавлять фото в альбомы. Снова подключите Immich на странице путешествий и "
+        "опубликуйте ещё раз.",
+        "Mail-A-Patatina поки не може додавати фото до альбомів. Знову підключіть Immich на сторінці подорожей і "
+        "опублікуйте ще раз."),
+    "You were signed out. What you wrote is kept on this device. Sign in again (it opens in a new tab), then come "
+    "back here and save again.": (
+        "Du wurdest abgemeldet. Was du geschrieben hast, bleibt auf diesem Gerät. Melde dich neu an (das öffnet "
+        "sich in einem neuen Tab), komm dann hierher zurück und speichere noch einmal.",
+        "Vous avez été déconnecté. Ce que vous avez écrit est conservé sur cet appareil. Reconnectez-vous (cela "
+        "s'ouvre dans un nouvel onglet), puis revenez ici et enregistrez à nouveau.",
+        "Sinut kirjattiin ulos. Kirjoittamasi säilyy tällä laitteella. Kirjaudu uudelleen (se avautuu uuteen "
+        "välilehteen), palaa sitten tänne ja tallenna uudelleen.",
+        "Вы вышли из системы. Написанное сохранено на этом устройстве. Войдите снова (откроется новая вкладка), "
+        "затем вернитесь сюда и сохраните ещё раз.",
+        "Ви вийшли із системи. Написане збережено на цьому пристрої. Увійдіть знову (відкриється нова вкладка), "
+        "потім поверніться сюди й збережіть ще раз."),
 }
 
 CATALOG: dict[str, dict[str, str]] = {

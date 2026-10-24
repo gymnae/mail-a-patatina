@@ -17,6 +17,12 @@
 </section>
 
 <section class="panel">
+  <h2>Trips</h2>
+  <p class="hint">A travel journal next to the feed: entries with text and photos, shared with the relatives you pick.</p>
+  <p><a class="button primary" href="/setup/f/{{ raw.id }}/trips/">✏️ Write in the journal</a></p>
+</section>
+
+<section class="panel">
   <h2>People</h2>
   <p class="hint">Everyone the Immich album is shared with gets the daily email and can like and comment under their own name.</p>
   <ul class="people">
@@ -199,8 +205,9 @@
     <input type="hidden" name="csrf" value="{{ session.csrf }}"><input type="hidden" name="feed_id" value="{{ raw.id }}">
     <button>Connect with Immich again</button>
   </form>
-  <p class="hint">Or paste a key you created by hand, with the same permissions as when you set up the feed:</p>
+  <p class="hint">Or paste a key you created by hand.</p>
   {% endif %}
+  <p class="hint">The key needs exactly these permissions: {% for p in owner_permissions %}<code>{{ p }}</code> {% endfor %}</p>
   <form method="post" action="/setup/f/{{ raw.id }}/key" class="row">
     <input type="hidden" name="csrf" value="{{ session.csrf }}">
     <label>New API key<input name="api_key" type="password" required autocomplete="off"></label>

@@ -23,11 +23,13 @@ RELATIVE_PERMISSIONS = [
 ]
 KEY_NAME = "mail-a-patatina"
 # What the album owner's key needs (entered on the setup page). The only delete right is albumUser.delete,
-# which takes someone out of the album (never photos or accounts).
+# which takes someone out of the album (never photos or accounts). album.create and albumAsset.create are for
+# trips: the editor makes each trip's album and adds the photos picked for an entry to it.
 OWNER_PERMISSIONS = [
     "album.read", "asset.read", "asset.view", "asset.update", "activity.read", "user.read",
-    "albumUser.create", "albumUser.delete",
+    "albumUser.create", "albumUser.delete", "album.create", "albumAsset.create",
 ]
+TRIP_PERMISSIONS = ["album.create", "albumAsset.create"]  # what keys from before trips existed may lack
 # What a co-parent's key needs: record deliveries on their own photos (only an asset's owner may).
 CONTRIBUTOR_PERMISSIONS = ["user.read", "asset.read", "asset.update"]
 
@@ -125,6 +127,15 @@ class Immich:
     async def album(self, album_id: str) -> dict:
         return await self._call("GET", f"/albums/{album_id}")
 
+    async def create_album(self, name: str, users: list[tuple[str, str]]) -> dict:
+        """A new album of this user's, shared with (user id, role) pairs."""
+        return await self._call("POST", "/albums", json={
+            "albumName": name, "albumUsers": [{"userId": u, "role": r} for u, r in users]})
+
+    async def add_album_assets(self, album_id: str, asset_ids: list[str]) -> None:
+        """Photos already in the album are fine (Immich answers "duplicate" for them)."""
+        await self._call("PUT", f"/albums/{album_id}/assets", json={"ids": asset_ids})
+
     async def add_album_user(self, album_id: str, user_id: str, role: str = "viewer") -> None:
         await self._call("PUT", f"/albums/{album_id}/users", json={"albumUsers": [{"userId": user_id, "role": role}]})
 
@@ -151,6 +162,18 @@ class Immich:
                 page = int(assets["nextPage"])
             else:
                 return
+
+    async def search_page(self, after: str = "", **filters) -> tuple[list[dict], str]:
+        """One page of matching assets; -> (assets, what to pass as `after` for the next page, "" at the end)."""
+        body = {"withExif": True, **filters}
+        if after.startswith("c:"):
+            body["cursor"] = after[2:]
+        else:
+            body["page"] = int(after[2:]) if after.startswith("p:") else 1
+        assets = (await self._call("POST", "/search/metadata", json=body))["assets"]
+        nxt = f"c:{assets['nextCursor']}" if assets.get("nextCursor") else (
+            f"p:{assets['nextPage']}" if assets.get("nextPage") else "")
+        return assets["items"], nxt
 
     async def thumbnail(self, asset_id: str, size: str) -> bytes:
         r = await self.http.get(f"/assets/{asset_id}/thumbnail", params={"size": size})

@@ -1,0 +1,54 @@
+{% extends "setup/layout.html" %}
+{% block page_title %}{{ entry.title or _("New entry") }}{% endblock %}
+{% block nav %}{% include "setup/write_nav.html" %}{% endblock %}
+{% block content %}
+<p class="back"><a href="/setup/f/{{ raw.id }}/trips/{{ slug }}/">← {{ trip_title }}</a></p>
+<div id="editor" class="editor">
+  <p id="restore" class="notice" role="status" hidden></p>
+  <input id="title" class="entry-title" value="{{ entry.title }}" placeholder="{{ _('Title (optional)') }}" maxlength="120" aria-label="{{ _('Title (optional)') }}">
+  <div class="row">
+    <label>{{ _("Date") }}<input type="date" id="date" value="{{ day }}" required></label>
+    <label>{{ _("Place") }}<input id="place" value="{{ entry.place }}" placeholder="{{ _('Where were you?') }}" maxlength="120"></label>
+  </div>
+  <div id="blocks"></div>
+  <div class="add-row">
+    <button type="button" class="secondary" id="add-text">+ {{ _("Text") }}</button>
+    <button type="button" class="secondary" id="add-photos">+ {{ _("Photos") }}</button>
+  </div>
+  <div class="save-bar">
+    <p id="status" class="hint" role="status"></p>
+    <div class="save-buttons">
+      <button type="button" class="secondary" id="save-secondary"></button>
+      <button type="button" class="primary" id="save-primary"></button>
+    </div>
+  </div>
+</div>
+{% if entry.slug %}
+<form method="post" action="/setup/f/{{ raw.id }}/trips/{{ slug }}/e/{{ entry.slug }}/delete" class="delete-entry"
+      onsubmit='return confirm({{ _("Delete this entry? Its photos stay in Immich.") | tojson }})'>
+  <input type="hidden" name="csrf" value="{{ session.csrf }}">
+  <button class="link">{{ _("Delete this entry") }}</button>
+</form>
+{% endif %}
+
+<div id="picker" class="picker" hidden role="dialog" aria-modal="true" aria-label="{{ _('Pick photos') }}">
+  <div class="picker-head">
+    <div class="tabs" role="tablist">
+      <button type="button" class="tab" data-mode="day" role="tab">{{ _("That day") }}</button>
+      <button type="button" class="tab" data-mode="recent" role="tab">{{ _("Recent") }}</button>
+      <button type="button" class="tab" data-mode="album" role="tab">{{ _("Album") }}</button>
+    </div>
+    <button type="button" class="close" id="picker-close" aria-label="{{ _('Close') }}"><svg viewBox="0 0 24 24" width="1em" height="1em" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/></svg></button>
+  </div>
+  <div class="picker-body">
+    <label class="picker-day">{{ _("Photos taken on") }} <input type="date" id="picker-day"></label>
+    <div id="picker-grid" class="picker-grid"></div>
+    <p id="picker-empty" class="hint" hidden></p>
+    <p class="hint">{{ _("Photos show up here once the Immich app on your phone has backed them up.") }}</p>
+    <button type="button" class="secondary" id="picker-more" hidden></button>
+  </div>
+  <div class="picker-foot"><button type="button" class="primary" id="picker-add" disabled></button></div>
+</div>
+<script type="application/json" id="entry-data">{{ data | tojson }}</script>
+<script src="/static/write.js?v={{ asset_version }}" defer></script>
+{% endblock %}

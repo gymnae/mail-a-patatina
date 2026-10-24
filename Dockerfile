@@ -7,7 +7,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY mail_a_patatina ./mail_a_patatina
-RUN useradd --uid 1000 --create-home app && mkdir -p /data /config /secrets && chown app /data /secrets
+RUN useradd --uid 1000 --create-home app && mkdir -p /data /config /secrets /journal && chown app /data /secrets /journal
 USER app
 
 EXPOSE 8080

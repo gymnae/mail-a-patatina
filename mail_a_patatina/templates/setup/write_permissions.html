@@ -1,0 +1,15 @@
+{% if missing %}
+<div class="notice error" role="alert">
+  <p>{{ _("Before you start a trip, Mail-A-Patatina needs to be allowed to make albums in Immich and add photos to them.") }}</p>
+  {% if immich_oauth %}
+  <form method="post" action="/setup/immich/connect">
+    <input type="hidden" name="csrf" value="{{ session.csrf }}"><input type="hidden" name="feed_id" value="{{ raw.id }}">
+    <button class="primary">{{ _("Allow it: connect with Immich again") }}</button>
+  </form>
+  <p class="hint">{{ _("Afterwards, come back here through Trips.") }}</p>
+  {% else %}
+  <p>{{ _("Whoever set up the feed can do this on the settings page, under “Immich key”, with a new key that also has these permissions:") }}
+    {% for p in missing %}<code>{{ p }}</code> {% endfor %}</p>
+  {% endif %}
+</div>
+{% endif %}

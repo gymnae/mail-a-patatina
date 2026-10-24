@@ -3,16 +3,20 @@
     JOURNAL_DIR/<feed id>/<trip>/trip.md      the trip: title, its Immich album, an optional intro
     JOURNAL_DIR/<feed id>/<trip>/<entry>.md   one entry: date, title, place, text, photos as ![…](immich:<asset id>)
 
-The text lives only in these files, and the app only reads them. Each trip is one Immich album: the people it
-is shared with may read the trip, and likes and comments on its photos are that album's Immich activity, kept
-apart from the family feed's. Rebuilt from the files and Immich on every sync, like the feed's library."""
+The text lives only in these files: the family writes them with the editor on the setup page (or any text
+editor), and the website reads them. Each trip is one Immich album: the people it is shared with may read the
+trip, and likes and comments on its photos are that album's Immich activity, kept apart from the family feed's.
+Rebuilt from the files and Immich on every sync, like the feed's library. Entries with `draft: true` are only
+shown in the editor."""
 
 from __future__ import annotations
 
 import datetime as dt
 import html
 import logging
+import os
 import re
+import unicodedata
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -30,7 +34,7 @@ log = logging.getLogger(__name__)
 
 FRONTMATTER = re.compile(r"\A---[ \t]*\n(.*?)\n---[ \t]*(?:\n|\Z)", re.S)
 # A photo or video: ![what it shows](immich:<asset id>), optionally with a title ("IMG_4412.HEIC").
-REF = re.compile(r'!\[(?P<alt>[^\]\n]*)\]\(immich:(?P<id>[0-9a-fA-F-]{36})(?:[ \t]+"[^"\n]*")?\)')
+REF = re.compile(r'!\[(?P<alt>[^\]\n]*)\]\(immich:(?P<id>[0-9a-fA-F-]{36})(?:[ \t]+"(?P<title>[^"\n]*)")?\)')
 ONLY_REFS = re.compile(rf"^\s*(?:{REF.pattern}\s*)+$")
 NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,79}$")  # trip folders and entry files, as they appear in URLs
 DATE_PREFIX = re.compile(r"^(\d{4}-\d{2}-\d{2})")
@@ -159,6 +163,8 @@ def blocks(body: str) -> list[tuple[str, object]]:
 
 def read_post(path: Path) -> Post | None:
     meta, body = _frontmatter(path.read_text(encoding="utf-8"))
+    if meta.get("draft"):
+        return None
     when = _when(meta.get("date"), path.stem)
     if when is None:
         log.warning("Journal: %s has no date (date: in its front matter, or a name starting YYYY-MM-DD)", path)
@@ -259,3 +265,137 @@ class Journal:
             if missing := written - len(post.media):
                 log.warning("Feed %s: %d photo(s) of %s/%s aren't in the trip's album and are left out",
                             feed.id, missing, trip.slug, post.slug)
+
+
+# --- writing: what the editor on the setup page reads and saves ---------------------------------------------
+
+ASSET_ID = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
+
+
+@dataclass
+class Draft:
+    """An entry as the editor sees it, drafts included: the text as written, photos as {id, caption, file}."""
+
+    slug: str  # "" for an entry that isn't saved yet
+    meta: dict
+    blocks: list[dict]  # {"kind": "text", "text": …} or {"kind": "photos", "photos": [{"id", "caption", "file"}]}
+    version: str = ""  # when the file was last changed, as read: saving checks nobody changed it in between
+
+    @property
+    def when(self) -> str:
+        return _when(self.meta.get("date"), self.slug) or ""
+
+    @property
+    def title(self) -> str:
+        return str(self.meta.get("title") or "")
+
+    @property
+    def place(self) -> str:
+        return str(self.meta.get("place") or "")
+
+    @property
+    def is_draft(self) -> bool:
+        return bool(self.meta.get("draft"))
+
+    @property
+    def photo_ids(self) -> list[str]:
+        return [p["id"] for b in self.blocks if b["kind"] == "photos" for p in b["photos"]]
+
+
+def raw_blocks(body: str) -> list[dict]:
+    """Like `blocks`, but the text stays Markdown, for editing."""
+    out: list[dict] = []
+    text: list[str] = []
+
+    def flush():
+        if "".join(text).strip():
+            out.append({"kind": "text", "text": "\n".join(text).strip("\n")})
+        text.clear()
+
+    for line in body.splitlines():
+        if ONLY_REFS.match(line):
+            flush()
+            out.append({"kind": "photos", "photos": [
+                {"id": m["id"].lower(), "caption": m["alt"].strip(), "file": m["title"] or ""} for m in REF.finditer(line)]})
+        else:
+            text.append(line)
+    flush()
+    return out
+
+
+def _version(path: Path) -> str:
+    return str(path.stat().st_mtime_ns)
+
+
+def load_draft(path: Path) -> Draft:
+    meta, body = _frontmatter(path.read_text(encoding="utf-8"))
+    return Draft(path.stem, meta, raw_blocks(body), _version(path))
+
+
+def drafts(folder: Path) -> list[Draft]:
+    """All entries of a trip, drafts included, the latest first."""
+    out = []
+    for path in folder.glob("*.md"):
+        if path.name != "trip.md" and NAME.match(path.stem):
+            try:
+                out.append(load_draft(path))
+            except (OSError, UnicodeDecodeError, yaml.YAMLError) as e:
+                log.warning("Journal: can't read %s: %s", path, e)
+    return sorted(out, key=lambda d: (d.when, d.slug), reverse=True)
+
+
+def _photo_ref(photo: dict) -> str:
+    caption = " ".join(str(photo.get("caption") or "").replace("[", "(").replace("]", ")").split())
+    file = " ".join(str(photo.get("file") or "").replace('"', "'").split())
+    return f'![{caption}](immich:{photo["id"]}' + (f' "{file}")' if file else ")")
+
+
+def entry_text(meta: dict, blocks: list[dict]) -> str:
+    """The file for an entry: front matter, then its text and lines of photos, separated by blank lines."""
+    parts = []
+    for b in blocks:
+        if b["kind"] == "text" and b["text"].strip():
+            parts.append(b["text"].strip("\n"))
+        elif b["kind"] == "photos" and b["photos"]:
+            parts.append(" ".join(_photo_ref(p) for p in b["photos"]))
+    front = yaml.safe_dump(meta, sort_keys=False, allow_unicode=True).strip() if meta else ""
+    return (f"---\n{front}\n---\n\n" if front else "") + "\n\n".join(parts) + "\n"
+
+
+def write_file(path: Path, text: str) -> None:
+    """Replace a file in one go, so nobody ever reads half of it."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_name(f".{path.name}.tmp")
+    tmp.write_text(text, encoding="utf-8")
+    os.replace(tmp, path)
+
+
+def slugify(text: str, fallback: str) -> str:
+    ascii_text = unicodedata.normalize("NFKD", text).encode("ascii", "ignore").decode()
+    return re.sub(r"[^a-z0-9]+", "-", ascii_text.lower()).strip("-")[:48].strip("-") or fallback
+
+
+def free_name(folder: Path, base: str, suffix: str = "") -> str:
+    """`base`, or base-2, base-3… if a file or folder of that name exists."""
+    name, n = base, 2
+    while (folder / f"{name}{suffix}").exists() or name == "trip":
+        name, n = f"{base}-{n}", n + 1
+    return name
+
+
+def trash(path: Path) -> None:
+    """Deleted entries go to the trip's .trash folder: out of sight, but nothing is lost by a wrong tap."""
+    stamp = dt.datetime.now().strftime("%Y%m%d-%H%M%S")
+    target = path.parent / ".trash" / f"{path.stem}-{stamp}{path.suffix}"
+    target.parent.mkdir(exist_ok=True)
+    os.replace(path, target)
+
+
+def trip_file(folder: Path) -> tuple[dict, str]:
+    index = folder / "trip.md"
+    return _frontmatter(index.read_text(encoding="utf-8")) if index.is_file() else ({}, "")
+
+
+def save_trip_file(folder: Path, meta: dict, intro: str) -> None:
+    front = yaml.safe_dump(meta, sort_keys=False, allow_unicode=True).strip()
+    write_file(folder / "trip.md", f"---\n{front}\n---\n" + (f"\n{intro.strip()}\n" if intro.strip() else ""))

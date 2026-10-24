@@ -199,7 +199,7 @@ async def logout(request: Request, csrf: str = Form()):
 
 def page(request: Request, template: str, session: SetupSession | None, status: int = 200, **ctx) -> HTMLResponse:
     s = settings(request)
-    ctx |= {"session": session, "viewer": None, "site_title": "Mail-A-Patatina", "base": "/setup", "like": LIKE,
+    ctx |= {"session": session, "viewer": None, "site_title": ctx.get("site_title", "Mail-A-Patatina"), "base": "/setup", "like": LIKE,
             "s": s, "oidc": bool(s.oidc_issuer)}
     return templates.TemplateResponse(request, template, ctx, status_code=status)
 
@@ -621,6 +621,7 @@ async def feed_page(request: Request, feed_id: str, msg: str = "", error: str = 
     return page(
         request, "setup/feed.html", session, raw=raw, feed=feed, members=members, channels=channels,
         coparents=coparents, skipped=skipped, coparent_permissions=CONTRIBUTOR_PERMISSIONS, immich_oauth=invites,
+        owner_permissions=OWNER_PERMISSIONS,
         waiting_coparents=waiting_coparents, invite_days=INVITE_DAYS,
         relative_permissions=RELATIVE_PERMISSIONS,
         whatsapp=whatsapp, whatsapp_down=whatsapp_down,

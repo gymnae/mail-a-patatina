@@ -1,0 +1,19 @@
+{% extends "setup/layout.html" %}
+{% block page_title %}{{ _("Trips") }}{% endblock %}
+{% block nav %}{% include "setup/write_nav.html" %}{% endblock %}
+{% block content %}
+<h1>{{ _("Trips") }} · {{ raw.title }}</h1>
+{% include "setup/write_permissions.html" %}
+{% if not missing %}<p><a class="button primary big" href="/setup/f/{{ raw.id }}/trips/new">+ {{ _("New trip") }}</a></p>{% endif %}
+{% for trip in trips %}
+<a class="card setup-card" href="/setup/f/{{ raw.id }}/trips/{{ trip.slug }}/">
+  <div class="card-body">
+    <p class="caption">{{ trip.title }}</p>
+    <p class="date">{{ _("Entries: {n}", n=trip.entries) }}{% if trip.drafts %} · {{ _("Drafts: {n}", n=trip.drafts) }}{% endif %}</p>
+  </div>
+</a>
+{% else %}
+<p>{{ _("No trips yet. Start one for your next holiday, or for one you'd like to remember.") }}</p>
+{% endfor %}
+<p class="hint center"><a href="/setup/f/{{ raw.id }}">{{ _("Settings") }}</a></p>
+{% endblock %}

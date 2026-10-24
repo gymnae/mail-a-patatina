@@ -38,20 +38,28 @@ def test_dates():
 
 def test_every_text_is_translated_with_the_same_placeholders():
     for english, translations in i18n._TEXTS.items():
+        assert len(translations) == len(i18n.LANGUAGES) - 1, english
         placeholders = set(re.findall(r"{(\w+)}", english))
         for translated in translations:
             assert translated and set(re.findall(r"{(\w+)}", translated)) == placeholders, (english, translated)
 
 
 def test_every_text_in_the_templates_has_a_translation():
+    from mail_a_patatina import write
+
     root = Path(i18n.__file__).parent
-    sources = [*root.glob("templates/*.*"), root / "templates/setup/join.html", root / "web.py", root / "setup.py",
-               root / "mailer.py", root / "dispatch.py"]
-    used = set()
+    sources = [*root.glob("templates/*.*"), root / "templates/setup/join.html", *root.glob("templates/setup/write*.html"),
+               root / "web.py", root / "setup.py", root / "mailer.py", root / "dispatch.py"]
+    used = set(write.EDITOR_TEXTS)
     for path in sources:
         text = path.read_text(encoding="utf-8")
         used |= set(re.findall(r'_\("((?:[^"\\]|\\.)*)"', text)) | set(re.findall(r"_\('((?:[^'\\]|\\.)*)'", text))
-    used = {u for u in used if u not in ("title", "text", "error")}
+    # The editor's messages from the server: t(lang, "…" "…"), the text possibly split over several lines.
+    for literals in re.findall(r't\(lang,\s*((?:"(?:[^"\\]|\\.)*"\s*)+)', (root / "write.py").read_text(encoding="utf-8")):
+        used.add("".join(re.findall(r'"((?:[^"\\]|\\.)*)"', literals)))
+    for literals in re.findall(r'fail\(\s*((?:"(?:[^"\\]|\\.)*"\s*)+)', (root / "write.py").read_text(encoding="utf-8")):
+        used.add("".join(re.findall(r'"((?:[^"\\]|\\.)*)"', literals)))
+    used = {u.replace("\\'", "'") for u in used if u not in ("title", "text", "error")}
     missing = sorted(u for u in used if u not in i18n._TEXTS)
     assert not missing
 

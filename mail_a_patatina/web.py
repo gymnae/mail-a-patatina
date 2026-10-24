@@ -36,6 +36,7 @@ from .links import LIKE, make_session, make_token, read_photo_ticket, read_sessi
 from .people import Member
 from .setup import ASSET_VERSION, EMAIL
 from .setup import router as setup_router
+from .write import router as write_router
 
 log = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -80,6 +81,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None)
 app.mount("/static", StaticFiles(directory=HERE / "static"), name="static")
 app.include_router(setup_router)  # before the /{feed_id} routes, so /setup is never taken for a feed
+app.include_router(write_router)
 templates = Jinja2Templates(directory=HERE / "templates")
 install(templates.env)
 templates.env.globals["asset_version"] = ASSET_VERSION

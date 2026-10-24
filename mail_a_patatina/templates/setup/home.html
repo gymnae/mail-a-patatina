@@ -9,6 +9,7 @@
     <p class="date">Every day at {{ f.send_time }} ({{ f.timezone }}) · {{ f.chats | length }} chat(s){% if f.pending %} · {{ f.pending | length }} waiting for approval{% endif %}</p>
   </div>
 </a>
+<p><a class="button primary" href="/setup/f/{{ f.id }}/trips/">✏️ Write in the journal</a></p>
 {% else %}
 <p>You haven't set up a family feed yet.</p>
 {% endfor %}

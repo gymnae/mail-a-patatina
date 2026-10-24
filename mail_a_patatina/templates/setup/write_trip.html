@@ -1,0 +1,36 @@
+{% extends "setup/layout.html" %}
+{% block page_title %}{{ title }}{% endblock %}
+{% block nav %}{% include "setup/write_nav.html" %}{% endblock %}
+{% block content %}
+<p class="back"><a href="/setup/f/{{ raw.id }}/trips/">← {{ _("Trips") }}</a></p>
+<h1>{{ title }}</h1>
+<p><a class="button primary big" href="/setup/f/{{ raw.id }}/trips/{{ slug }}/new">+ {{ _("New entry") }}</a></p>
+{% for e in entries %}
+<a class="card setup-card entry-card" href="/setup/f/{{ raw.id }}/trips/{{ slug }}/e/{{ e.slug }}">
+  {% if e.photo_ids %}<img src="/setup/f/{{ raw.id }}/photo/{{ e.photo_ids[0] }}" alt="" loading="lazy">{% endif %}
+  <div class="card-body">
+    <p class="date">{{ e.when | nice_date }}{% if e.place %} · {{ e.place }}{% endif %}</p>
+    <p class="caption">{{ e.title or _("Untitled") }}{% if e.is_draft %} <span class="tag wait">{{ _("Draft") }}</span>{% endif %}</p>
+  </div>
+</a>
+{% else %}
+<p class="hint">{{ _("No entries yet.") }}</p>
+{% endfor %}
+
+<details class="panel">
+  <summary><h2>{{ _("Trip settings") }}</h2></summary>
+  <form method="post" action="/setup/f/{{ raw.id }}/trips/{{ slug }}/settings" class="stack">
+    <input type="hidden" name="csrf" value="{{ session.csrf }}">
+    <label>{{ _("Name") }}<input name="title" value="{{ title }}" maxlength="80" required></label>
+    <fieldset>
+      <legend>{{ _("Who may read it?") }}</legend>
+      {% for r in readers %}
+      <label class="choice"><input type="checkbox" name="reader" value="{{ r.id }}"{% if r.id in shared %} checked{% endif %}>
+        {{ r.name or _("Your group chats ({names})", names=r.chats | join(", ")) }}</label>
+      {% endfor %}
+    </fieldset>
+    {% if others %}<p class="hint">{{ _("Also shared in Immich with: {names}", names=others | join(", ")) }}</p>{% endif %}
+    <button class="primary">{{ _("Save") }}</button>
+  </form>
+</details>
+{% endblock %}
