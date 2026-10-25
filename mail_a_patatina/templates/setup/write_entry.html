@@ -15,6 +15,7 @@
     <button type="button" class="secondary" id="add-text">+ {{ _("Text") }}</button>
     <button type="button" class="secondary" id="add-photos">+ {{ _("Photos") }}</button>
   </div>
+  <p class="preview-row"><button type="button" class="link" id="show-preview">{{ _("How will it look?") }}</button></p>
   <div class="save-bar">
     <p id="status" class="hint" role="status"></p>
     <div class="save-buttons">
@@ -48,6 +49,17 @@
     <button type="button" class="secondary" id="picker-more" hidden></button>
   </div>
   <div class="picker-foot"><button type="button" class="primary" id="picker-add" disabled></button></div>
+</div>
+<div id="preview" class="picker preview" hidden role="dialog" aria-modal="true" aria-label="{{ _('Preview') }}">
+  <div class="picker-head">
+    <p class="preview-title">{{ _("This is how the family will see it") }}</p>
+    <button type="button" class="close" id="preview-close" aria-label="{{ _('Close') }}"><svg viewBox="0 0 24 24" width="1em" height="1em" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/></svg></button>
+  </div>
+  <iframe id="preview-page" title="{{ _('Preview') }}" sandbox="allow-same-origin"></iframe>
+  <div class="picker-foot preview-foot">
+    <button type="button" class="secondary" id="preview-back">{{ _("Keep writing") }}</button>
+    <button type="button" class="primary" id="preview-save"></button>
+  </div>
 </div>
 <script type="application/json" id="entry-data">{{ data | tojson }}</script>
 <script src="/static/write.js?v={{ asset_version }}" defer></script>

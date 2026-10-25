@@ -264,6 +264,60 @@
     };
   })();
 
+  // --- how it will look ----------------------------------------------------------------
+
+  // The server lays the entry out on the readers' page, unsaved as it is; shown here without leaving the editor.
+  const preview = (() => {
+    const box = $("preview");
+    const frame = $("preview-page");
+
+    function close() {
+      box.hidden = true;
+      frame.srcdoc = "";
+      document.body.classList.remove("picking");
+    }
+
+    async function open() {
+      status(say("Loading…"));
+      let r;
+      try {
+        r = await fetch(data.urls.preview, {
+          method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ csrf: data.csrf, slug: entry.slug, ...snapshot() }),
+        });
+      } catch {
+        status(say("That didn't work"), true);
+        return;
+      }
+      const page = r.ok ? await r.text() : null;
+      if (!r.ok) {
+        let answer;
+        try { answer = await r.json(); } catch { answer = { error: say("That didn't work") }; }
+        if (answer.retry && answer.csrf !== data.csrf) {
+          data.csrf = answer.csrf; // signed in again meanwhile, in another tab
+          return open();
+        }
+        status(answer.error || say("That didn't work"), true);
+        if (answer.signed_out) {
+          $("status").append(" ", el("a", { href: data.urls.signin, target: "_blank", textContent: say("Sign in again") }));
+        }
+        return;
+      }
+      status(dirty ? say("Not saved yet") : "");
+      $("preview-save").textContent = $("save-primary").textContent;
+      frame.srcdoc = page;
+      box.hidden = false;
+      document.body.classList.add("picking");
+      $("preview-back").focus();
+    }
+
+    $("show-preview").addEventListener("click", open);
+    $("preview-close").addEventListener("click", close);
+    $("preview-back").addEventListener("click", close);
+    $("preview-save").addEventListener("click", () => { close(); save(true); });
+    document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !box.hidden) close(); });
+  })();
+
   // --- saving -------------------------------------------------------------------------
 
   function status(text, error = false) {

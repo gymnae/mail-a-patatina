@@ -9,7 +9,7 @@
   <link rel="stylesheet" href="/static/style.css?v={{ asset_version }}">
   <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
-  <script src="/static/live.js?v={{ asset_version }}" defer></script>
+  {% if not preview %}<script src="/static/live.js?v={{ asset_version }}" defer></script>{% endif %}
   {% block head %}{% endblock %}
 </head>
 <body{% if protect %} class="protect"{% endif %}>

@@ -122,7 +122,7 @@ textarea { resize: vertical; }
 .prose blockquote { margin: 12px 0; padding-left: 14px; border-left: 3px solid var(--line); color: var(--muted); }
 .gallery { display: grid; gap: 16px; margin: 20px 0; }
 .gallery.several { grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
-.gallery figure > a { display: block; }
+.gallery figure > a, .gallery figure > .live { display: block; }
 .gallery figcaption { font-size: 15px; margin: 6px 0 0; }
 .photo-reactions { display: flex; gap: 12px; align-items: center; margin-top: 6px; font-size: 14px; color: var(--muted); }
 .photo-reactions form { margin: 0; }
@@ -259,3 +259,9 @@ body.picking { overflow: hidden; }
 .picker-foot { padding: 10px 12px calc(10px + env(safe-area-inset-bottom)); border-top: 1px solid var(--line); }
 .picker-foot button { width: 100%; font-size: 18px; padding: 14px; }
 .picker-foot button:disabled { opacity: .45; }
+.preview-row { text-align: center; margin: 4px 0 0; }
+.preview-row .link { font-size: 16px; padding: 10px; }
+.preview-title { flex: 1; margin: 0; font-weight: 600; }
+.preview iframe { flex: 1; width: 100%; border: 0; background: var(--bg); }
+.preview-foot { display: flex; gap: 8px; }
+.preview-foot button { flex: 1; font-size: 17px; padding: 14px 10px; }

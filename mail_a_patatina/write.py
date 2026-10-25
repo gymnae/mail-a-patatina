@@ -222,7 +222,8 @@ def editor(request: Request, session: SetupSession, raw: dict, feed, slug: str, 
         "csrf": session.csrf, "storage": f"map-entry:{raw['id']}/{slug}/",
         "entry": {"slug": entry.slug, "version": entry.version, "blocks": entry.blocks or [{"kind": "text", "text": ""}],
                   "draft": entry.is_draft or not entry.slug},
-        "urls": {"save": f"{base}/save", "photos": f"{base}/photos", "thumb": f"/setup/f/{raw['id']}/photo",
+        "urls": {"save": f"{base}/save", "preview": f"{base}/preview", "photos": f"{base}/photos",
+                 "thumb": f"/setup/f/{raw['id']}/photo",
                  "edit": f"{base}/e/", "signin": "/setup/"},
         "texts": {k: t(lang, k) for k in EDITOR_TEXTS},
     }
@@ -269,17 +270,16 @@ def _clean_blocks(blocks) -> list[dict] | None:
     return out
 
 
-@router.post("/{feed_id}/trips/{slug}/save")
-async def save_entry(request: Request, background: BackgroundTasks, feed_id: str, slug: str):
-    """Called by the editor with the whole entry as JSON. Answers JSON: the editor stays on the page."""
-    lang = join_language(request)
-    fail = lambda text, status=400, **extra: JSONResponse({"error": t(lang, text), **extra}, status_code=status)  # noqa: E731
+async def _entry_from_editor(request: Request, fail) -> dict | Response:
+    """The entry the editor sends as JSON, or the answer to give when it can't be used."""
     # JSON only: other sites can't send that without asking first (CORS), so no form elsewhere can post here.
     if request.headers.get("content-type", "").split(";")[0].strip() != "application/json":
         raise HTTPException(415)
     try:
         body = await request.json()
     except ValueError:
+        return fail("That didn't work")
+    if not isinstance(body, dict):
         return fail("That didn't work")
     session = current(request)
     if session is None:
@@ -289,8 +289,6 @@ async def save_entry(request: Request, background: BackgroundTasks, feed_id: str
     if not secrets.compare_digest(str(body.get("csrf", "")), session.csrf):
         # Signed in again in another tab: this page's token is from the old sign-in. Same origin only, see above.
         return JSONResponse({"csrf": session.csrf, "retry": True}, status_code=409)
-    _, raw, feed, root = writer(request, feed_id)
-    folder = trip_folder(root, slug)
     blocks = _clean_blocks(body.get("blocks"))
     try:
         day = dt.date.fromisoformat(str(body.get("date", "")))
@@ -298,6 +296,20 @@ async def save_entry(request: Request, background: BackgroundTasks, feed_id: str
         return fail("Pick a date.")
     if blocks is None:
         return fail("That didn't work")
+    return {**body, "blocks": blocks, "day": day}
+
+
+@router.post("/{feed_id}/trips/{slug}/save")
+async def save_entry(request: Request, background: BackgroundTasks, feed_id: str, slug: str):
+    """Called by the editor with the whole entry as JSON. Answers JSON: the editor stays on the page."""
+    lang = join_language(request)
+    fail = lambda text, status=400, **extra: JSONResponse({"error": t(lang, text), **extra}, status_code=status)  # noqa: E731
+    body = await _entry_from_editor(request, fail)
+    if isinstance(body, Response):
+        return body
+    _, raw, feed, root = writer(request, feed_id)
+    folder = trip_folder(root, slug)
+    blocks, day = body["blocks"], body["day"]
     entry_slug = str(body.get("slug") or "")
     if entry_slug:
         path = folder / f"{entry_slug}.md"
@@ -345,6 +357,39 @@ async def save_entry(request: Request, background: BackgroundTasks, feed_id: str
     log.info("Feed %s: %s %s/%s", feed_id, "published" if publish else "saved draft", slug, entry_slug)
     _refresh_later(background, feed)
     return {"slug": entry_slug, "version": journal._version(path), "published": publish}
+
+
+VIDEO_FILES = (".mov", ".mp4", ".m4v", ".3gp", ".webm", ".mkv", ".avi")
+
+
+@router.post("/{feed_id}/trips/{slug}/preview")
+async def preview_entry(request: Request, feed_id: str, slug: str):
+    """The entry as the editor has it, saved or not, on the page relatives read it on."""
+    from .web import Activity, render  # the reader's pages, which include this router
+
+    lang = join_language(request)
+    fail = lambda text, status=400, **extra: JSONResponse({"error": t(lang, text), **extra}, status_code=status)  # noqa: E731
+    body = await _entry_from_editor(request, fail)
+    if isinstance(body, Response):
+        return body
+    _, raw, feed, root = writer(request, feed_id)
+    folder = trip_folder(root, slug)
+    meta, _ = journal.trip_file(folder)
+    text = journal.entry_text({}, body["blocks"]).split("---\n", 2)[-1]
+    post = journal.Post(str(body.get("slug") or "preview"), body["day"].isoformat(),
+                        " ".join(str(body.get("title") or "").split())[:120],
+                        " ".join(str(body.get("place") or "").split())[:120], journal.blocks(text))
+    files = {p["id"]: p["file"] for b in body["blocks"] if b["kind"] == "photos" for p in b["photos"]}
+    known = {m.asset_id: m for t in feed.journal.trips.values() for p in t.posts for m in p.media}
+    for m in post.media:
+        if m.asset_id in known:
+            m.type, m.live_video_id = known[m.asset_id].type, known[m.asset_id].live_video_id
+        elif files.get(m.asset_id, "").lower().endswith(VIDEO_FILES):
+            m.type = "VIDEO"
+    trip = journal.Trip(slug, str(meta.get("title") or slug), str(meta.get("album_id") or ""), "", [post])
+    nobody = Activity([], None, [])
+    return render(request, "trip_post.html", None, feed=feed, trip=trip, post=post, preview=True,
+                  photo_url=f"/setup/f/{feed_id}/photo/", reactions={m.asset_id: nobody for m in post.media})
 
 
 @router.post("/{feed_id}/trips/{slug}/e/{entry_slug}/delete")
@@ -397,12 +442,12 @@ async def photos(request: Request, feed_id: str, slug: str, mode: str = "day", d
 
 
 @router.get("/{feed_id}/photo/{asset_id}")
-async def photo(request: Request, feed_id: str, asset_id: str):
-    """A small picture of a photo from the family's library, for the editor and the picker."""
+async def photo(request: Request, feed_id: str, asset_id: str, size: str = "thumb"):
+    """A picture of a photo from the family's library: small for the editor and the picker, big for the preview."""
     _, _, feed, _ = writer(request, feed_id)
-    if not journal.ASSET_ID.match(asset_id):
+    if not journal.ASSET_ID.match(asset_id) or size not in ("thumb", "preview"):
         raise HTTPException(404)
-    data = await core(request).media.jpeg(feed.curator, asset_id, "thumb")
+    data = await core(request).media.jpeg(feed.curator, asset_id, size)
     return Response(data, media_type="image/jpeg", headers={"Cache-Control": "private, max-age=86400"})
 
 
@@ -412,5 +457,5 @@ EDITOR_TEXTS = [
     "Remove", "Move up", "Move down", "Add more photos here", "Write here…", "Nothing found for this day.",
     "No photos here yet.", "Add photos ({n})", "Show more", "Publish", "Save as draft", "Save changes",
     "Turn back into a draft", "Sign in again", "Restore what I wrote", "You wrote more on this device than was saved.",
-    "Restored what you wrote on this device before.", "video", "Loading…",
+    "Restored what you wrote on this device before.", "video", "Loading…", "Preview",
 ]

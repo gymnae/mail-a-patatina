@@ -219,3 +219,18 @@ def test_only_the_feeds_owner_writes(client, writing):
     writing.session.email = "someone@example.com"
     assert client.get("/setup/f/falks/trips/").status_code == 404
     assert start_trip(client, writing).status_code == 404
+
+
+def test_preview_shows_unsaved_text_as_relatives_would_see_it(client, writing):
+    start_trip(client, writing)
+    body = {"csrf": writing.session.csrf, "slug": "", "title": "Rentiere!", "date": "2026-08-04", "place": "Kuusamo",
+            "blocks": [{"kind": "text", "text": "Die Kinder haben die **Rentiere** gefüttert."},
+                       {"kind": "photos", "photos": [{"id": P1, "caption": "Fütterung", "file": "IMG_1.HEIC"},
+                                                     {"id": P2, "caption": "", "file": "VID_2.MOV"}]}]}
+    r = client.post("/setup/f/falks/trips/sommer-in-lappland/preview", json=body, headers={"Accept-Language": "de"})
+    assert r.status_code == 200 and "<strong>Rentiere</strong>" in r.text and "Kuusamo" in r.text
+    assert f'src="/setup/f/falks/photo/{P1}?size=preview"' in r.text and "Fütterung</figcaption>" in r.text
+    assert r.text.count("live-badge") == 1 and "Video" in r.text  # the .MOV, before Immich has been asked
+    assert not list((writing.root / "sommer-in-lappland").glob("2026-*.md"))  # nothing saved
+    r = client.post("/setup/f/falks/trips/sommer-in-lappland/preview", json={**body, "csrf": "old"})
+    assert r.status_code == 409 and r.json()["retry"]

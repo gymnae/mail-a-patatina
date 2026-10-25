@@ -1040,6 +1040,20 @@ _TEXTS: dict[str, tuple[str, str, str, str, str]] = {  # English: (German, Frenc
         "Takaisin luonnokseksi",
         "Снова в черновик",
         "Знову в чернетку"),
+    "Preview": ("Vorschau", "Aperçu", "Esikatselu", "Предпросмотр", "Попередній перегляд"),
+    "How will it look?": (
+        "Wie sieht das aus?",
+        "À quoi ça ressemble ?",
+        "Miltä tämä näyttää?",
+        "Как это будет выглядеть?",
+        "Як це виглядатиме?"),
+    "This is how the family will see it": (
+        "So sieht es die Familie",
+        "Voilà ce que verra la famille",
+        "Näin perhe näkee sen",
+        "Так это увидит семья",
+        "Так це побачить родина"),
+    "Keep writing": ("Weiterschreiben", "Continuer à écrire", "Jatka kirjoittamista", "Писать дальше", "Писати далі"),
     "Sign in again": (
         "Neu anmelden",
         "Se reconnecter",
