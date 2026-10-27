@@ -46,8 +46,9 @@ if (document.body.classList.contains("protect")) {
 }
 
 // A loupe for looking closer at a photo: a click or tap on it turns it on, another turns it off. A mouse moves it
-// around; a finger drags it, held a little above the finger so it doesn't cover the spot. It shows the same
-// picture the page does, so there's nothing new to save.
+// around; a finger drags it, with the loupe just above the finger so it doesn't cover the spot (or, near the top
+// of the screen, in the upper corner away from the finger). It shows the same picture the page does, so there's
+// nothing new to save.
 for (const figure of document.querySelectorAll(".zoomable")) {
   const img = figure.querySelector("img");
   const loupe = document.createElement("div");
@@ -57,13 +58,14 @@ for (const figure of document.querySelectorAll(".zoomable")) {
   let on = false;
   let down = null;   // where a finger or pen touched, so a drag doesn't also count as a tap
   let dragged = false;
+  let touched = 0;   // when a finger last let go: iOS follows a touch with mouse events, which must not move the loupe
   let last = null;   // the latest pointer, drawn on the next frame
   let frame = 0;
 
   const toggle = (value) => {
     on = value;
     figure.classList.toggle("zooming", on);
-    if (!on) loupe.hidden = true;
+    if (!on) hide();
   };
   const draw = () => {
     frame = 0;
@@ -82,19 +84,31 @@ for (const figure of document.querySelectorAll(".zoomable")) {
     const zoom = Math.max(2.5, img.naturalWidth / r.width || 0);
     loupe.hidden = false;
     const size = loupe.offsetWidth;
-    const lift = mouse ? 0 : size * 0.75;
     loupe.style.backgroundImage = `url("${img.currentSrc || img.src}")`;
     loupe.style.backgroundSize = `${r.width * zoom}px ${r.height * zoom}px`;
     loupe.style.backgroundPosition = `${size / 2 - x * zoom}px ${size / 2 - y * zoom}px`;
-    // Placed on the page, not the screen: iOS moves fixed things around as its toolbars come and go.
+
+    // Where it goes on the screen (what's visible of it, even when pinched in), then on the page.
+    const view = window.visualViewport || { offsetLeft: 0, offsetTop: 0, width: innerWidth };
+    const edge = 8;
+    const fx = r.left + x;
+    const fy = r.top + y;
+    let left = fx - size / 2;
+    let top = mouse ? fy - size / 2 : fy - size - 24;
+    if (!mouse && top < view.offsetTop + edge) {
+      // No room above the finger: beside it, in the upper corner on the other half of the screen.
+      left = fx > view.offsetLeft + view.width / 2 ? view.offsetLeft + edge : view.offsetLeft + view.width - size - edge;
+      top = Math.max(fy - size / 2, view.offsetTop + edge);
+    }
     // Kept inside the screen's width: hanging past the edge would widen the page and make it jump sideways.
-    const room = document.documentElement.clientWidth - size;
-    const left = Math.min(Math.max(r.left + x - size / 2, 0), room) + window.scrollX;
-    const top = r.top + y + window.scrollY - size / 2 - lift;
-    loupe.style.transform = `translate3d(${left}px, ${top}px, 0)`;
+    left = Math.min(Math.max(left, view.offsetLeft), view.offsetLeft + view.width - size);
+    // Placed on the page, not the screen: iOS moves fixed things around as its toolbars come and go.
+    loupe.style.transform = `translate3d(${left + scrollX}px, ${top + scrollY}px, 0)`;
   };
   const show = (e) => {
-    last = { x: e.clientX, y: e.clientY, mouse: e.pointerType === "mouse" };
+    const mouse = e.pointerType === "mouse";
+    if (mouse && Date.now() - touched < 1000) return;
+    last = { x: e.clientX, y: e.clientY, mouse };
     if (!frame) frame = requestAnimationFrame(draw);
   };
   const hide = () => {
@@ -121,11 +135,14 @@ for (const figure of document.querySelectorAll(".zoomable")) {
   figure.addEventListener("touchmove", (e) => { if (on) e.preventDefault(); }, { passive: false });
   const up = (e) => {
     down = null;
-    if (e.pointerType !== "mouse") hide();
+    if (e.pointerType !== "mouse") {
+      touched = Date.now();
+      hide();
+    }
   };
   figure.addEventListener("pointerup", up);
   figure.addEventListener("pointercancel", up);
   figure.addEventListener("pointerleave", (e) => { if (e.pointerType === "mouse") hide(); });
-  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && on) { toggle(false); hide(); } });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && on) toggle(false); });
   window.addEventListener("scroll", () => { if (on && !down) hide(); }, { passive: true });
 }
