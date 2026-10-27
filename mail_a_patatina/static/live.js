@@ -46,9 +46,8 @@ if (document.body.classList.contains("protect")) {
 }
 
 // A loupe for looking closer at a photo: a click or tap on it turns it on, another turns it off. A mouse moves it
-// around; a finger drags it, with the loupe just above the finger so it doesn't cover the spot (or, near the top
-// of the screen, in the upper corner away from the finger). It shows the same picture the page does, so there's
-// nothing new to save.
+// around; a finger drags it, with the loupe just above the finger so it doesn't cover the spot. It shows the same
+// picture the page does, so there's nothing new to save.
 for (const figure of document.querySelectorAll(".zoomable")) {
   const img = figure.querySelector("img");
   const loupe = document.createElement("div");
@@ -65,14 +64,7 @@ for (const figure of document.querySelectorAll(".zoomable")) {
   const toggle = (value) => {
     on = value;
     figure.classList.toggle("zooming", on);
-    if (!on) return hide();
-    // A finger on the photo won't scroll while the loupe is on, so bring all of it into view first: links to the
-    // comments (from emails, or after commenting) can open the page with the top of the photo above the screen.
-    const r = img.getBoundingClientRect();
-    const height = window.visualViewport ? visualViewport.height : innerHeight;
-    if (r.top < 0 || r.bottom > height) {
-      img.scrollIntoView({ block: r.height < height ? "center" : "start", behavior: "smooth" });
-    }
+    if (!on) hide();
   };
   const draw = () => {
     frame = 0;
@@ -102,11 +94,8 @@ for (const figure of document.querySelectorAll(".zoomable")) {
     const fy = r.top + y;
     let left = fx - size / 2;
     let top = mouse ? fy - size / 2 : fy - size - 24;
-    if (!mouse && top < view.offsetTop + edge) {
-      // No room above the finger: beside it, in the upper corner on the other half of the screen.
-      left = fx > view.offsetLeft + view.width / 2 ? view.offsetLeft + edge : view.offsetLeft + view.width - size - edge;
-      top = Math.max(fy - size / 2, view.offsetTop + edge);
-    }
+    // Always over the spot it magnifies: near the top of the screen it stops at the edge and slides over the finger.
+    if (!mouse) top = Math.max(top, view.offsetTop + edge);
     // Kept inside the screen's width: hanging past the edge would widen the page and make it jump sideways.
     left = Math.min(Math.max(left, view.offsetLeft), view.offsetLeft + view.width - size);
     // Placed on the page, not the screen: iOS moves fixed things around as its toolbars come and go.
