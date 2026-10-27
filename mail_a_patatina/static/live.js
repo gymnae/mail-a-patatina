@@ -65,7 +65,14 @@ for (const figure of document.querySelectorAll(".zoomable")) {
   const toggle = (value) => {
     on = value;
     figure.classList.toggle("zooming", on);
-    if (!on) hide();
+    if (!on) return hide();
+    // A finger on the photo won't scroll while the loupe is on, so bring all of it into view first: links to the
+    // comments (from emails, or after commenting) can open the page with the top of the photo above the screen.
+    const r = img.getBoundingClientRect();
+    const height = window.visualViewport ? visualViewport.height : innerHeight;
+    if (r.top < 0 || r.bottom > height) {
+      img.scrollIntoView({ block: r.height < height ? "center" : "start", behavior: "smooth" });
+    }
   };
   const draw = () => {
     frame = 0;
