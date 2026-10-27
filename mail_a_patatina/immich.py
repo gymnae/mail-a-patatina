@@ -15,20 +15,21 @@ class LoginFailed(Exception):
     pass
 
 
-# What a relative's own API key may do: like and comment (and take back their own like or comment), and
-# read/write their email setting. activity.delete is the only delete right any key of this project holds.
-RELATIVE_PERMISSIONS = [
-    "activity.create", "activity.read", "activity.delete", "user.read", "userPreference.read", "userPreference.update",
-]
+# Liking and commenting, and taking back one's own like or comment: what everyone's key needs to post
+# on the website in their own name. activity.delete never removes someone else's (the website checks).
+ACTIVITY_PERMISSIONS = ["activity.create", "activity.read", "activity.delete"]
+# What a relative's own API key may do: like and comment, and read/write their email setting.
+RELATIVE_PERMISSIONS = [*ACTIVITY_PERMISSIONS, "user.read", "userPreference.read", "userPreference.update"]
 KEY_NAME = "mail-a-patatina"
-# What the album owner's key needs (entered on the setup page). The only delete right is albumUser.delete,
-# which takes someone out of the album (never photos or accounts).
+# What the album owner's key needs (entered on the setup page). Besides activity.delete, the only delete
+# right is albumUser.delete, which takes someone out of the album (never photos or accounts).
 OWNER_PERMISSIONS = [
-    "album.read", "asset.read", "asset.view", "asset.update", "activity.read", "user.read",
+    "album.read", "asset.read", "asset.view", "asset.update", *ACTIVITY_PERMISSIONS, "user.read",
     "albumUser.create", "albumUser.delete",
 ]
-# What a co-parent's key needs: record deliveries on their own photos (only an asset's owner may).
-CONTRIBUTOR_PERMISSIONS = ["user.read", "asset.read", "asset.update"]
+# What a co-parent's key needs: record deliveries on their own photos (only an asset's owner may), and
+# like and comment on the website in their own name.
+CONTRIBUTOR_PERMISSIONS = ["user.read", "asset.read", "asset.update", *ACTIVITY_PERMISSIONS]
 
 
 class Immich:

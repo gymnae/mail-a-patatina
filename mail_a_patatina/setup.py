@@ -28,7 +28,8 @@ from fastapi.templating import Jinja2Templates
 
 from . import dispatch, mailer
 from .config import CHAT_KINDS, clean_email
-from .immich import CONTRIBUTOR_PERMISSIONS, KEY_NAME, OWNER_PERMISSIONS, RELATIVE_PERMISSIONS, Immich, LoginFailed
+from .immich import (ACTIVITY_PERMISSIONS, CONTRIBUTOR_PERMISSIONS, KEY_NAME, OWNER_PERMISSIONS, RELATIVE_PERMISSIONS,
+                     Immich, LoginFailed)
 from .library import now
 from .i18n import from_header, install
 from .links import INVITE_DAYS, LIKE, invite_url, make_token, read_invite
@@ -222,7 +223,45 @@ async def home(request: Request):
     if session is None:
         return page(request, "setup/login.html", None)
     feeds = core(request).store.owned_by(session.email)
-    return page(request, "setup/home.html", session, feeds=feeds)
+    owned_ids = {f["id"] for f in feeds}
+    family = family_feeds(request, session.email)
+    return page(request, "setup/home.html", session, feeds=feeds, can_open={f.id for f in family},
+                helping=[f for f in family if f.id not in owned_ids])
+
+
+def family_feeds(request: Request, email: str) -> list:
+    """The feeds whose album this person owns or adds photos to as a co-parent: they see those as themselves."""
+    out = []
+    for feed in core(request).feeds.values():
+        member = feed.by_email(email)
+        if member is not None and feed.is_family(member):
+            out.append(feed)
+    return sorted(out, key=lambda f: f.cfg.title.casefold())
+
+
+@router.get("/f/{feed_id}/open")
+async def open_feed(request: Request, feed_id: str):
+    """Signs the owner or a co-parent in on the family's website as themselves, like a relative's email link
+    would: they see the feed, and like and comment in their own name."""
+    from .web import Viewer, sign_in  # the website, which includes this router
+
+    session = require(request)
+    feed = core(request).feeds.get(feed_id)
+    member = feed.by_email(session.email) if feed else None
+    if member is None or not feed.is_family(member):
+        raise HTTPException(404)
+    response = RedirectResponse(f"/{feed_id}/", status_code=303)
+    sign_in(response, feed, Viewer(feed, member))
+    return response
+
+
+async def lacks(client: Immich, needed: list[str]) -> list[str]:
+    """What a key here isn't allowed to do of `needed` (keys made before it was needed). [] if unknown."""
+    try:
+        perms = set((await client.api_key_info()).get("permissions", []))
+    except httpx.HTTPError:
+        return []
+    return [] if "all" in perms else [p for p in needed if p not in perms]
 
 
 # --- new feed: 1. the key, 2. the album and rules ------------------------------------
@@ -485,7 +524,16 @@ async def finish_join(request: Request, token: str, nonce: str, state: str, veri
         save_key(s.keys_file, member.email, key)
         await c.people.reload_keys()
         text = "You'll get “{title}” by email, and can like and comment on every photo."
-    response = join_message(request, "Thanks, {name}!", text, name=member.name, title=raw["title"])
+    if role == "coparent" and (fresh := c.feeds.get(raw["id"])) and (me_there := fresh.members.get(member.id)):
+        # Just proved who they are to Immich: signed in on the family's website too, to see it as themselves.
+        from .web import Viewer, sign_in
+
+        response = page(request, "setup/message.html", None, title="Thanks, {name}!", text=text, home=False,
+                        values={"name": member.name, "title": raw["title"]}, lang=join_language(request),
+                        link=f"/{raw['id']}/", link_label="See the feed")
+        sign_in(response, fresh, Viewer(fresh, me_there))
+    else:
+        response = join_message(request, "Thanks, {name}!", text, name=member.name, title=raw["title"])
     response.delete_cookie(JOIN_COOKIE, path="/setup")
     return response
 
@@ -613,14 +661,20 @@ async def feed_page(request: Request, feed_id: str, msg: str = "", error: str = 
         except (httpx.HTTPError, GatewayError):
             log.exception("WhatsApp gateway for %s", feed_id)
             whatsapp_down = True
-    coparents, skipped = [], []
+    coparents, skipped, owner_missing, outdated = [], [], [], {}
     if feed is not None:
         coparents = [feed.members.get(uid) or uid for uid in contributor_keys(feed)]
+        owner_missing = await lacks(feed.curator, OWNER_PERMISSIONS)
+        # Keys from before co-parents could comment: a new invite makes them one that may.
+        for uid in contributor_keys(feed):
+            if uid in feed.members and await lacks(feed.writers[uid], ACTIVITY_PERMISSIONS):
+                outdated[uid] = invite_url(s, feed_id, uid, "coparent") if invites else None
         skipped = [feed.members[uid].name if uid in feed.members else "someone no longer in the album"
                    for uid in feed.unkeyed]
     return page(
         request, "setup/feed.html", session, raw=raw, feed=feed, members=members, channels=channels,
         coparents=coparents, skipped=skipped, coparent_permissions=CONTRIBUTOR_PERMISSIONS, immich_oauth=invites,
+        owner_permissions=OWNER_PERMISSIONS, owner_missing=owner_missing, outdated=outdated,
         waiting_coparents=waiting_coparents, invite_days=INVITE_DAYS,
         relative_permissions=RELATIVE_PERMISSIONS,
         whatsapp=whatsapp, whatsapp_down=whatsapp_down,

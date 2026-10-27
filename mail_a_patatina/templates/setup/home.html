@@ -9,8 +9,19 @@
     <p class="date">Every day at {{ f.send_time }} ({{ f.timezone }}) · {{ f.chats | length }} chat(s){% if f.pending %} · {{ f.pending | length }} waiting for approval{% endif %}</p>
   </div>
 </a>
+{% if f.id in can_open %}<p><a class="button" href="/setup/f/{{ f.id }}/open">👀 See the feed</a></p>{% endif %}
 {% else %}
-<p>You haven't set up a family feed yet.</p>
+{% if not helping %}<p>You haven't set up a family feed yet.</p>{% endif %}
 {% endfor %}
+{% if helping %}
+<h2>Feeds you add photos to</h2>
+{% for f in helping %}
+<div class="card setup-card"><div class="card-body">
+  <p class="caption">{{ f.cfg.title }}</p>
+  <p class="date">As a co-parent: see the moments and trips, and like and comment in your own name.</p>
+  <p><a class="button primary" href="/setup/f/{{ f.id }}/open">👀 See the feed</a></p>
+</div></div>
+{% endfor %}
+{% endif %}
 <p><a class="button primary" href="/setup/new">+ New family feed</a></p>
 {% endblock %}

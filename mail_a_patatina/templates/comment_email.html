@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="{{ lang }}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>{{ title }}</title>
+</head>
+<body style="margin:0;padding:0;background:#f4f1ec;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#2b2622;">
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f4f1ec;">
+<tr><td align="center" style="padding:24px 12px;">
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:600px;">
+  <tr><td style="padding:0 4px 18px;">
+    <table role="presentation" cellspacing="0" cellpadding="0"><tr>
+      <td style="padding-right:12px;"><img src="cid:{{ logo_cid }}" width="60" height="60" alt="" style="display:block;border:0;"></td>
+      <td style="font-size:20px;font-weight:700;color:#5a3a1c;">{{ title }}<div style="font-size:15px;font-weight:400;color:#7a6f66;padding-top:2px;">{{ _("{name} commented", name=who) }} 💬</div></td>
+    </tr></table>
+  </td></tr>
+  <tr><td style="padding-bottom:24px;">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#ffffff;border-radius:14px;overflow:hidden;">
+      {% if image_cid %}
+      <tr><td>
+        <a href="{{ url }}"><img src="cid:{{ image_cid }}" width="600" alt="{{ what or _('Photo') }}" style="display:block;width:100%;height:auto;border:0;"></a>
+      </td></tr>
+      {% endif %}
+      {% if what %}
+      <tr><td style="padding:16px 20px 0;font-size:13px;color:#7a6f66;">{{ what }}</td></tr>
+      {% endif %}
+      <tr><td style="padding:12px 20px 4px;">
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f4f1ec;border-radius:12px;">
+          <tr><td style="padding:12px 16px;">
+            <div style="font-size:14px;font-weight:700;color:#5a3a1c;padding-bottom:4px;">{{ who }}</div>
+            <div style="font-size:17px;line-height:1.45;white-space:pre-line;">{{ body }}</div>
+          </td></tr>
+        </table>
+      </td></tr>
+      <tr><td style="padding:12px 14px 18px;">
+        <a href="{{ url }}#comments" style="display:inline-block;margin:4px;padding:10px 16px;border-radius:999px;background:#2b2622;color:#ffffff;font-size:15px;text-decoration:none;">💬 {{ _("Reply") }}</a>
+      </td></tr>
+    </table>
+  </td></tr>
+  <tr><td align="center" style="padding:8px 4px 0;font-size:13px;color:#7a6f66;line-height:1.6;">
+    {% if name %}{{ _("These links sign you in as {name} for {days} days, so please don't forward this email.", name=name, days=link_days) }}<br>{% endif %}
+    {{ _("You get this email because comments in {title} are sent to you.", title=title) }}
+    {% if settings_url %}<br><a href="{{ settings_url }}" style="color:#a39a91;">{{ _("Switch it off in the settings") }}</a>{% endif %}
+    {% if off_url %}<br><a href="{{ off_url }}" style="color:#a39a91;">{{ _("Stop these emails") }}</a>{% endif %}
+  </td></tr>
+</table>
+</td></tr>
+</table>
+</body>
+</html>

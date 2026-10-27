@@ -71,6 +71,31 @@ def build_digest(
     return msg
 
 
+def build_comment(feed: FeedConfig, to: str, lang: str, ctx: dict, image: bytes | None) -> EmailMessage:
+    """Tells the family about a new comment, in the daily email's look: the photo, who wrote what, and a
+    button back to it. `ctx`: who, body, what (the photo's caption), url, name, link_days,
+    settings_url (each may be empty)."""
+    domain = parseaddr(feed.smtp_from)[1].rpartition("@")[2] or None
+    logo_cid, image_cid = make_msgid(domain=domain), make_msgid(domain=domain)
+    ctx = {**ctx, "lang": lang, "title": feed.title, "logo_cid": logo_cid[1:-1],
+           "image_cid": image_cid[1:-1] if image else None}
+    msg = EmailMessage()
+    headline = t(lang, "{name} commented", name=ctx["who"])
+    msg["Subject"] = t(lang, "{title}: {subject}", title=feed.title, subject=headline)
+    msg["From"] = feed.smtp_from
+    msg["To"] = to
+    msg["Date"] = formatdate(localtime=True)
+    msg["Message-ID"] = make_msgid(domain=domain)
+    msg.set_content(_env.get_template("comment_email.txt").render(ctx))
+    msg.add_alternative(_env.get_template("comment_email.html").render(ctx), subtype="html")
+    html_part = msg.get_payload()[1]
+    html_part.add_related(LOGO, "image", "png", cid=logo_cid, filename="mail-a-patatina.png")
+    if image:
+        html_part.add_related(image, "image", "jpeg", cid=image_cid, filename="photo.jpg")
+    msg["Content-Language"] = lang  # last: set_content() drops Content-* headers
+    return msg
+
+
 def build_simple(sender: str, to: list[str], subject: str, body: str) -> EmailMessage:
     msg = EmailMessage()
     msg["Subject"] = subject

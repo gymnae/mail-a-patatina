@@ -3,5 +3,6 @@
 {% block content %}
 <h1>{{ _(title, **(values or {})) }}</h1>
 <p>{{ _(text, **(values or {})) }}</p>
+{% if link %}<p><a class="button primary" href="{{ link }}">👀 {{ _(link_label) }}</a></p>{% endif %}
 {% if home is not defined or home %}<p><a class="button" href="/setup/">Back</a></p>{% endif %}
 {% endblock %}

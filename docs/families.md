@@ -37,7 +37,23 @@ docker compose run --rm -e IMMICH_ADMIN_API_KEY app python -m mail_a_patatina fo
 
 ## Co-parents who add their own photos
 
-Immich only lets a photo's owner write its metadata, where Mail-A-Patatina records what was sent. So the co-parent needs a key in *their own* account. Once the album is shared with them in Immich as editor, they show up under *Co-parents*. If Immich signs in through OAuth, the parent sends them the link shown there; they sign in to Immich once and the key (`user.read`, `asset.read`, `asset.update`) is created for them. Otherwise they create that key themselves and the parent pastes it. Either way the co-parent never signs in to the setup page. The key must belong to someone the album is shared with. Until a key is added, their photos are skipped, and the setup page says whose. For families in `feeds.yml`, the admin lists the keys under `contributor_keys`.
+Immich only lets a photo's owner write its metadata, where Mail-A-Patatina records what was sent. So the co-parent needs a key in *their own* account. Once the album is shared with them in Immich as editor, they show up under *Co-parents*. If Immich signs in through OAuth, the parent sends them the link shown there; they sign in to Immich once and the key (`user.read`, `asset.read`, `asset.update`, `activity.create`, `activity.read`, `activity.delete`) is created for them. Otherwise they create that key themselves and the parent pastes it. The key must belong to someone the album is shared with. Until a key is added, their photos are skipped, and the setup page says whose. For families in `feeds.yml`, the admin lists the keys under `contributor_keys`.
+
+## Seeing the feed as the family
+
+The owner and the co-parents don't get the daily email, but they can look at the family's website as themselves: likes and comments go out in their own name, so they can answer the relatives right there.
+
+- **The owner** taps **👀 See the feed** on the setup page.
+- **A co-parent** is signed in on the website right after accepting the invite link. Later they sign in to `PUBLIC_URL/setup/` with their own account, where the feed is listed under *Feeds you add photos to*.
+- **Keys from before this existed** can't like or comment yet. The setup page says so: the owner connects with Immich again (or pastes a key that also has `activity.create` and `activity.delete`), and co-parents get a fresh invite link shown next to their name.
+
+## Emails about comments
+
+Every new comment is emailed to the family, in the daily email's look: the photo, who wrote what, and a **Reply** button. The button signs them in on the website as themselves, so the answer goes out in their name. Nobody is emailed about their own comments.
+
+- **The owner** gets them with *email me when someone comments* switched on in the settings.
+- **Co-parents** get them too, and can stop them with **Stop these emails** at the bottom of each one.
+- **Families in `feeds.yml`:** they go to `admin_emails` only, because there's nowhere to store a co-parent's choice.
 
 ## Where the settings live
 
