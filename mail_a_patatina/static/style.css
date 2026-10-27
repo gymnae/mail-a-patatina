@@ -67,12 +67,14 @@ figure { margin: 0; }
 }
 /* The loupe on a photo's own page (see live.js): a click or tap turns it on, then it follows the
    mouse, or the finger while it's down. While it's on, the photo doesn't scroll the page under a finger. */
+.zoomable { touch-action: manipulation; }  /* tapping it on and off doesn't double-tap zoom the page */
 .zoomable > img, .zoomable > .live { cursor: zoom-in; }
-.zoomable.zooming > img, .zoomable.zooming > .live { cursor: zoom-out; touch-action: none; }
+.zoomable.zooming > img, .zoomable.zooming > .live { cursor: zoom-out; }
+.zoomable.zooming, .zoomable.zooming * { touch-action: none; -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
 .zooming .live video { display: none; }
 .loupe {
-  position: fixed; z-index: 20; width: min(260px, 62vw); height: min(260px, 62vw); border-radius: 50%; pointer-events: none;
-  border: 3px solid #fff; box-shadow: 0 4px 18px rgba(0, 0, 0, .35); background-repeat: no-repeat; background-color: var(--chip);
+  position: absolute; top: 0; left: 0; z-index: 20; will-change: transform; width: min(260px, 62vw); height: min(260px, 62vw); border-radius: 50%; pointer-events: none;
+  border: 3px solid #fff; box-shadow: 0 4px 18px rgba(0, 0, 0, .35); background: no-repeat border-box var(--chip);
 }
 .loupe[hidden] { display: none; }
 .card-body { padding: 4px 16px 14px; }

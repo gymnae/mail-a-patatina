@@ -57,30 +57,50 @@ for (const figure of document.querySelectorAll(".zoomable")) {
   let on = false;
   let down = null;   // where a finger or pen touched, so a drag doesn't also count as a tap
   let dragged = false;
+  let last = null;   // the latest pointer, drawn on the next frame
+  let frame = 0;
 
   const toggle = (value) => {
     on = value;
     figure.classList.toggle("zooming", on);
     if (!on) loupe.hidden = true;
   };
-  const show = (e) => {
+  const draw = () => {
+    frame = 0;
+    const { x: cx, y: cy, mouse } = last;
     const r = img.getBoundingClientRect();
-    const x = e.clientX - r.left;
-    const y = e.clientY - r.top;
-    if (x < 0 || y < 0 || x > r.width || y > r.height) {
+    let x = cx - r.left;
+    let y = cy - r.top;
+    if (mouse && (x < 0 || y < 0 || x > r.width || y > r.height)) {
       loupe.hidden = true;
       return;
     }
+    // A finger that strays past the edge keeps the loupe at the edge instead of flickering it away.
+    x = Math.min(Math.max(x, 0), r.width);
+    y = Math.min(Math.max(y, 0), r.height);
     // At least the picture's own sharpness, and never less than 2.5 times what's on screen.
     const zoom = Math.max(2.5, img.naturalWidth / r.width || 0);
-    const size = loupe.offsetWidth || 260;
-    const lift = e.pointerType === "mouse" ? 0 : size * 0.7;
+    loupe.hidden = false;
+    const size = loupe.offsetWidth;
+    const lift = mouse ? 0 : size * 0.75;
     loupe.style.backgroundImage = `url("${img.currentSrc || img.src}")`;
     loupe.style.backgroundSize = `${r.width * zoom}px ${r.height * zoom}px`;
     loupe.style.backgroundPosition = `${size / 2 - x * zoom}px ${size / 2 - y * zoom}px`;
-    loupe.style.left = `${e.clientX - size / 2}px`;
-    loupe.style.top = `${e.clientY - size / 2 - lift}px`;
-    loupe.hidden = false;
+    // Placed on the page, not the screen: iOS moves fixed things around as its toolbars come and go.
+    // Kept inside the screen's width: hanging past the edge would widen the page and make it jump sideways.
+    const room = document.documentElement.clientWidth - size;
+    const left = Math.min(Math.max(r.left + x - size / 2, 0), room) + window.scrollX;
+    const top = r.top + y + window.scrollY - size / 2 - lift;
+    loupe.style.transform = `translate3d(${left}px, ${top}px, 0)`;
+  };
+  const show = (e) => {
+    last = { x: e.clientX, y: e.clientY, mouse: e.pointerType === "mouse" };
+    if (!frame) frame = requestAnimationFrame(draw);
+  };
+  const hide = () => {
+    cancelAnimationFrame(frame);
+    frame = 0;
+    loupe.hidden = true;
   };
 
   figure.addEventListener("click", (e) => {
@@ -97,13 +117,15 @@ for (const figure of document.querySelectorAll(".zoomable")) {
     if (down && Math.hypot(e.clientX - down[0], e.clientY - down[1]) > 8) dragged = true;
     if (on && (e.pointerType === "mouse" || down)) show(e);
   });
+  // iOS doesn't always honour touch-action, so while the loupe is on, a finger on the photo never scrolls.
+  figure.addEventListener("touchmove", (e) => { if (on) e.preventDefault(); }, { passive: false });
   const up = (e) => {
     down = null;
-    if (e.pointerType !== "mouse") loupe.hidden = true;
+    if (e.pointerType !== "mouse") hide();
   };
   figure.addEventListener("pointerup", up);
   figure.addEventListener("pointercancel", up);
-  figure.addEventListener("pointerleave", (e) => { if (e.pointerType === "mouse") loupe.hidden = true; });
-  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && on) toggle(false); });
-  window.addEventListener("scroll", () => { if (on) loupe.hidden = true; }, { passive: true });
+  figure.addEventListener("pointerleave", (e) => { if (e.pointerType === "mouse") hide(); });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && on) { toggle(false); hide(); } });
+  window.addEventListener("scroll", () => { if (on && !down) hide(); }, { passive: true });
 }
