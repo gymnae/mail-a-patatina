@@ -76,7 +76,21 @@ figure { margin: 0; }
   position: absolute; top: 0; left: 0; z-index: 20; will-change: transform; width: min(260px, 62vw); height: min(260px, 62vw); border-radius: 50%; pointer-events: none;
   border: 3px solid #fff; box-shadow: 0 4px 18px rgba(0, 0, 0, .35); background: no-repeat border-box var(--chip);
 }
-.loupe[hidden] { display: none; }
+.loupe[hidden], .lens[hidden] { display: none; }
+.loupe.gliding { transition: transform .28s cubic-bezier(.2, .8, .2, 1); }
+.loupe, .lens { animation: loupe-in .15s ease-out; }
+@keyframes loupe-in { from { opacity: 0; } }
+/* The lens under the pointer: a glass lying on the photo, with a rim, a darker edge and a highlight. */
+.lens {
+  position: absolute; top: 0; left: 0; z-index: 19; will-change: transform; border-radius: 50%; pointer-events: none;
+  background: no-repeat border-box var(--chip); border: 2px solid rgba(255, 255, 255, .9);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, .4), inset 0 0 0 1px rgba(0, 0, 0, .2), inset 0 -4px 10px rgba(0, 0, 0, .3);
+}
+.lens::after {
+  content: ""; position: absolute; inset: 0; border-radius: 50%;
+  background: radial-gradient(circle at 32% 26%, rgba(255, 255, 255, .6), rgba(255, 255, 255, 0) 36%),
+              radial-gradient(circle, rgba(0, 0, 0, 0) 62%, rgba(0, 0, 0, .22));
+}
 .card-body { padding: 4px 16px 14px; }
 .counts { color: var(--muted); font-size: 14px; margin: 8px 0 0; display: flex; gap: 12px; }
 
