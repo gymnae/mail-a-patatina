@@ -3,7 +3,7 @@
 {% block main %}
 {% if back %}<nav class="pager back"><a href="{{ back[0] }}">← {{ back[1] }}</a></nav>{% endif %}
 <article class="moment">
-  <figure>
+  <figure{% if entry.type != "VIDEO" %} class="zoomable"{% endif %}>
     {% if entry.type == "VIDEO" %}
     <video controls playsinline preload="none"{% if protect %} controlslist="nodownload"{% endif %} poster="{{ src }}/preview" src="{{ video_src }}"></video>
     {% elif entry.live_video_id %}
@@ -14,6 +14,11 @@
     </div>
     {% else %}
     <img src="{{ src }}/preview" alt="{{ entry.caption }}">
+    {% endif %}
+    {% if entry.type != "VIDEO" %}
+    <button class="zoom" type="button" aria-pressed="false" aria-label="{{ _('Zoom in') }}" title="{{ _('Zoom in') }}">
+      <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6" fill="none" stroke="currentColor" stroke-width="2.2"/><path d="M15 15l5.5 5.5M10.5 7.5v6M7.5 10.5h6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
+    </button>
     {% endif %}
   </figure>
   <p class="date">{{ entry.taken_at | nice_date }}</p>
