@@ -209,12 +209,6 @@ _TEXTS: dict[str, tuple[str, str, str, str, str]] = {  # English: (German, Frenc
         "Uudemmat",
         "Позже",
         "Пізніше"),
-    "Zoom in": (
-        "Vergrößern",
-        "Zoomer",
-        "Suurenna",
-        "Увеличить",
-        "Збільшити"),
     "A moment": (
         "Ein Moment",
         "Un moment",

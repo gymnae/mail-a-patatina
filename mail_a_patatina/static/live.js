@@ -45,12 +45,11 @@ if (document.body.classList.contains("protect")) {
   document.addEventListener("contextmenu", (e) => { if (e.target.closest("video")) e.preventDefault(); });
 }
 
-// A loupe for looking closer at a photo: the button (or a click on the photo) turns it on. A mouse moves it
+// A loupe for looking closer at a photo: a click or tap on it turns it on, another turns it off. A mouse moves it
 // around; a finger drags it, held a little above the finger so it doesn't cover the spot. It shows the same
 // picture the page does, so there's nothing new to save.
 for (const figure of document.querySelectorAll(".zoomable")) {
   const img = figure.querySelector("img");
-  const button = figure.querySelector(".zoom");
   const loupe = document.createElement("div");
   loupe.className = "loupe";
   loupe.hidden = true;
@@ -62,7 +61,6 @@ for (const figure of document.querySelectorAll(".zoomable")) {
   const toggle = (value) => {
     on = value;
     figure.classList.toggle("zooming", on);
-    button.setAttribute("aria-pressed", on);
     if (!on) loupe.hidden = true;
   };
   const show = (e) => {
@@ -75,7 +73,7 @@ for (const figure of document.querySelectorAll(".zoomable")) {
     }
     // At least the picture's own sharpness, and never less than 2.5 times what's on screen.
     const zoom = Math.max(2.5, img.naturalWidth / r.width || 0);
-    const size = loupe.offsetWidth || 180;
+    const size = loupe.offsetWidth || 260;
     const lift = e.pointerType === "mouse" ? 0 : size * 0.7;
     loupe.style.backgroundImage = `url("${img.currentSrc || img.src}")`;
     loupe.style.backgroundSize = `${r.width * zoom}px ${r.height * zoom}px`;
@@ -85,10 +83,6 @@ for (const figure of document.querySelectorAll(".zoomable")) {
     loupe.hidden = false;
   };
 
-  button.addEventListener("click", (e) => {
-    e.stopPropagation();
-    toggle(!on);
-  });
   figure.addEventListener("click", (e) => {
     if (e.defaultPrevented || dragged) return;  // a held live photo or a loupe drag, not a tap
     toggle(!on);

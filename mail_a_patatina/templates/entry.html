@@ -15,11 +15,6 @@
     {% else %}
     <img src="{{ src }}/preview" alt="{{ entry.caption }}">
     {% endif %}
-    {% if entry.type != "VIDEO" %}
-    <button class="zoom" type="button" aria-pressed="false" aria-label="{{ _('Zoom in') }}" title="{{ _('Zoom in') }}">
-      <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6" fill="none" stroke="currentColor" stroke-width="2.2"/><path d="M15 15l5.5 5.5M10.5 7.5v6M7.5 10.5h6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
-    </button>
-    {% endif %}
   </figure>
   <p class="date">{{ entry.taken_at | nice_date }}</p>
   {% if entry.caption %}<p class="caption">{{ entry.caption }}</p>{% endif %}
