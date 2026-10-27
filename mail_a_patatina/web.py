@@ -26,8 +26,8 @@ from starlette.background import BackgroundTask
 
 from . import mailer
 from .config import ChatSpec, Settings, clean_email
-from .core import Core, Feed
-from .i18n import from_header, install
+from .core import Core, Feed, NotConnected
+from .i18n import from_header, install, nice_date
 from .i18n import t as translate  # `t` is the magic-link parameter here
 from .immich import LoginFailed
 from .journal import Media, Post, Trip
@@ -179,7 +179,7 @@ async def magic_link(request: Request, call_next):
     token = request.query_params.get("t")
     parts = request.url.path.strip("/").split("/")
     feed = core.feeds.get(parts[0])
-    if feed is None or request.method != "GET" or (len(parts) > 1 and parts[1] == "unsubscribe"):
+    if feed is None or request.method != "GET" or (len(parts) > 1 and parts[1] in ("unsubscribe", "comment-emails")):
         return await call_next(request)
     if not token:
         response = await call_next(request)
@@ -230,6 +230,15 @@ async def not_found(request: Request, exc):
 async def login_failed(request: Request, exc):
     return message_page(
         request, "Can't post right now", "Your Immich account isn't set up for this yet. The family has been told.", 503
+    )
+
+
+@app.exception_handler(NotConnected)
+async def not_connected(request: Request, exc):
+    return message_page(
+        request, "Can't post right now",
+        "Mail-A-Patatina isn't allowed to like and comment in your name yet. Connect it with Immich again on the "
+        "setup page, or ask for a new invite link.", 503,
     )
 
 
@@ -397,9 +406,9 @@ async def _toggle_like(viewer: Viewer, album_id: str, asset_id: str, mode: str) 
     feed, account = viewer.feed, require_account(viewer)
     current = _for_asset(feed, await feed.curator.activities(album_id), asset_id, viewer).my_like_id
     if current is None:
-        await core.people.run_as(account, lambda c: c.add_activity(album_id, asset_id, "like"))
+        await feed.act_as(account, lambda c: c.add_activity(album_id, asset_id, "like"))
     elif mode == "toggle" and not viewer.is_guest:  # a group's shared like isn't one visitor's to take back
-        await core.people.run_as(account, lambda c: c.delete_activity(current))
+        await feed.act_as(account, lambda c: c.delete_activity(current))
 
 
 async def _comment(viewer: Viewer, response: Response, album_id: str, asset_id: str, body: str, name: str) -> str:
@@ -412,7 +421,7 @@ async def _comment(viewer: Viewer, response: Response, album_id: str, asset_id: 
     if not body:
         return ""
     text = f"[{viewer.guest_name or 'Guest'}] {body}" if viewer.is_guest else body
-    await core.people.run_as(account, lambda c: c.add_activity(album_id, asset_id, "comment", text))
+    await feed.act_as(account, lambda c: c.add_activity(album_id, asset_id, "comment", text))
     return body
 
 
@@ -424,7 +433,7 @@ async def _delete_comment(viewer: Viewer, album_id: str, activity_id: str) -> di
     activity = next((a for a in await feed.curator.activities(album_id) if a["id"] == activity_id), None)
     if activity is None or activity["user"]["id"] != account.id:
         raise HTTPException(404)
-    await core.people.run_as(account, lambda c: c.delete_activity(activity_id))
+    await feed.act_as(account, lambda c: c.delete_activity(activity_id))
     return activity
 
 
@@ -451,12 +460,7 @@ async def comment(
     if not body:
         return response
     feed.activities_changed()
-    who = viewer.name or "Someone"
-    background.add_task(
-        feed.notify_admins,
-        f"{feed.cfg.title}: {who} commented",
-        f"{who} on “{entry.caption}”:\n\n{body}\n\n{core.settings.public_url}/{feed.id}/e/{asset_id}",
-    )
+    background.add_task(tell_about_comment, viewer, asset_id, body, f"/{feed.id}/e/{asset_id}", entry.caption)
     return response
 
 
@@ -610,12 +614,7 @@ async def trip_comment(request: Request, background: BackgroundTasks, feed_id: s
     if not body:
         return response
     trip.activity.changed()
-    who = viewer.name or "Someone"
-    background.add_task(
-        viewer.feed.notify_admins,
-        f"{trip.title}: {who} commented",
-        f"{who} on a photo in “{post.title or post.day}”:\n\n{body}\n\n{core.settings.public_url}{here}",
-    )
+    background.add_task(tell_about_comment, viewer, asset_id, body, here, post.title or None, trip.title, post.day)
     return response
 
 
@@ -637,6 +636,46 @@ async def trip_media_file(request: Request, feed_id: str, slug: str, post_slug: 
         raise HTTPException(404)
     data = await core.media.jpeg(viewer.feed.curator, asset_id, size)
     return Response(data, media_type="image/jpeg", headers={"Cache-Control": "private, max-age=86400"})
+
+
+async def tell_about_comment(viewer: Viewer, asset_id: str, body: str, path: str, what: str | None,
+                             trip: str | None = None, day: str | None = None) -> None:
+    """Emails the family a new comment, with the photo and a link to answer it: the feed's admin emails, and
+    the co-parents unless they switched it off. Their link signs them in on the website when they're in the
+    album, so they can reply in their own name."""
+    feed, s = viewer.feed, core.settings
+    who = viewer.name or "Someone"
+    commenter = viewer.account.email if viewer.account and not viewer.is_guest else None
+    raw = core.store.get(feed.id)  # co-parents can switch these off only on feeds set up on the setup page
+    quiet = set(raw.get("quiet_comments", [])) if raw else set()
+    coparents = [m.email for m in feed.others() if feed.is_coparent(m) and m.id not in quiet] if raw else []
+    to = [a for a in dict.fromkeys(clean_email(a) for a in [*feed.cfg.admin_emails, *coparents]) if a != commenter]
+    if not (to and s.smtp_host):
+        return
+    try:
+        image = await core.media.jpeg(feed.curator, asset_id, "thumb")
+    except Exception:
+        log.warning("Feed %s: no picture of %s for a comment email", feed.id, asset_id)
+        image = None
+    admins = {clean_email(a) for a in feed.cfg.admin_emails}
+    for address in to:
+        member = feed.by_email(address)
+        lang = (member and core.languages.get(member.id)) or s.default_language
+        signed_in = member is not None and member.email != feed.cfg.bot_email
+        token = make_token(s, feed.id, "u", member.id) if signed_in else ""
+        # The owner switches these off in the settings; a co-parent, who has none, right from the email.
+        settings_url = f"{s.public_url}/setup/f/{feed.id}" if raw and address in admins else ""
+        off_url = (f"{s.public_url}/{feed.id}/comment-emails?{urlencode({'t': token})}"
+                   if signed_in and address not in admins else "")
+        ctx = {"who": who, "body": body, "trip": trip, "settings_url": settings_url, "off_url": off_url,
+               "link_days": s.link_days,
+               "what": what or (nice_date(day, lang) if day else ""),
+               "url": f"{s.public_url}{path}" + (f"?{urlencode({'t': token})}" if token else ""),
+               "name": member.name if signed_in else ""}
+        try:
+            await mailer.send(s, mailer.build_comment(feed.cfg, address, lang, ctx, image))
+        except Exception:
+            log.exception("Could not email feed %s's family about a comment", feed.id)
 
 
 # --- unsubscribe (one-click capable, RFC 8058) — stored as the member's Immich email preference ---
@@ -662,6 +701,32 @@ async def unsubscribe(request: Request, feed_id: str, t: str = ""):
     await core.people.run_as(member, lambda c: c.update_preferences({"emailNotifications": {"enabled": False}}))
     return message_page(request, "Unsubscribed", "You won't get these emails anymore. Your links still open the album.",
                         feed=feed)
+
+
+def _coparent_for_comment_emails(feed_id: str, token: str) -> tuple[Feed, Member, dict]:
+    feed = get_feed(feed_id)
+    found = link_viewer(feed, token)  # works with expired links too, like unsubscribing
+    raw = core.store.get(feed.id)
+    if found is None or found[0].is_guest or raw is None or not feed.is_coparent(found[0].account):
+        raise HTTPException(404)
+    return feed, found[0].account, raw
+
+
+@app.get("/{feed_id}/comment-emails", response_class=HTMLResponse)
+async def comment_emails_confirm(request: Request, feed_id: str, t: str = ""):
+    feed, member, _ = _coparent_for_comment_emails(feed_id, t)
+    return render(request, "comment_emails_off.html", None, feed=feed, email=member.email, token=t)
+
+
+@app.post("/{feed_id}/comment-emails", response_class=HTMLResponse)
+async def comment_emails_off(request: Request, feed_id: str, t: str = ""):
+    """A co-parent stops the emails about comments (they have no settings page to do it on)."""
+    feed, member, raw = _coparent_for_comment_emails(feed_id, t)
+    quiet = raw.setdefault("quiet_comments", [])
+    if member.id not in quiet:
+        quiet.append(member.id)
+        core.store.save(raw)
+    return message_page(request, "Unsubscribed", "You won't get emails about new comments anymore.", feed=feed)
 
 
 # --- expired links and "Not you?" ---------------------------------------------

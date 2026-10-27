@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}{{ _("Unsubscribe") }} · {{ site_title }}{% endblock %}
+{% block main %}
+<div class="message">
+  <h1>{{ _("Stop the emails about comments?") }}</h1>
+  <p>{{ _("{email} won't get any more emails when someone comments in {title}. You still see the comments on the website.", email=email, title=site_title) }}</p>
+  <form method="post" action="{{ base }}/comment-emails?t={{ token | urlencode }}"><button>{{ _("Unsubscribe") }}</button></form>
+</div>
+{% endblock %}

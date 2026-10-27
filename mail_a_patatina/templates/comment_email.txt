@@ -1,0 +1,11 @@
+{{ _("{name} commented", name=who) }}{% if what or trip %} ({% if trip %}{{ trip }}{% if what %} · {% endif %}{% endif %}{{ what }}){% endif %}:
+
+{{ body }}
+
+{{ _("Reply") }}: {{ url }}#comments
+
+{% if name %}{{ _("These links sign you in as {name} for {days} days, so please don't forward this email.", name=name, days=link_days) }}
+{% endif %}{{ _("You get this email because comments in {title} are sent to you.", title=title) }}
+{% if settings_url %}{{ _("Switch it off in the settings") }}: {{ settings_url }}
+{% endif %}{% if off_url %}{{ _("Stop these emails") }}: {{ off_url }}
+{% endif %}

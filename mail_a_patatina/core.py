@@ -7,6 +7,8 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from collections.abc import Awaitable, Callable
+from typing import TypeVar
 
 import httpx
 
@@ -23,6 +25,11 @@ from .people import Member, People
 from .store import FeedStore
 
 log = logging.getLogger(__name__)
+T = TypeVar("T")
+
+
+class NotConnected(Exception):
+    """The owner or a co-parent wants to like or comment, but their key here isn't allowed to (yet)."""
 
 
 class Feed:
@@ -60,6 +67,10 @@ class Feed:
         (has photos in the album but no key here, or is an editor with an Immich account of their own)."""
         connected = m.id in self.writers and self.writers[m.id] is not self.curator
         return connected or m.id in self.unkeyed or (m.role == "editor" and not m.managed)
+
+    def is_family(self, m: Member) -> bool:
+        """The album's owner or a co-parent: they look at the feed from the setup page, not from emails."""
+        return m.role == "owner" or self.is_coparent(m)
 
     def relatives(self) -> list[Member]:
         """Members who get the daily email: everyone else the album is shared with, but not the co-parents."""
@@ -101,6 +112,21 @@ class Feed:
             await self.core.people.reload_keys()
             await sync.run(self)
             await dispatch.run(self)
+
+    async def act_as(self, member: Member, action: Callable[[Immich], Awaitable[T]]) -> T:
+        """Run an Immich call (a like, a comment) as this member: the owner and the co-parents through their
+        keys here, relatives through their own accounts (People)."""
+        if not self.is_family(member):
+            return await self.core.people.run_as(member, action)
+        client = self.writers.get(member.id)
+        if client is None:
+            raise NotConnected(member.id)
+        try:
+            return await action(client)
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code in (401, 403):  # a key from before it was allowed to, or revoked
+                raise NotConnected(member.id) from e
+            raise
 
     async def activities(self) -> list[dict]:
         return await self._activity.get()

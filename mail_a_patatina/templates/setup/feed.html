@@ -5,11 +5,24 @@
 <p class="hint">{{ moments }} moment(s) shared · sends every day at {{ raw.send_time }} ({{ raw.timezone }}) ·
   <a href="{{ link }}" target="_blank" rel="noopener">{{ link }}</a></p>
 
+{% if owner_missing %}
+<div class="notice error" role="alert">
+  <p>Mail-A-Patatina needs more permissions from your Immich key, so that you can like and comment on the feed in your own name{% if "album.create" in owner_missing %} and write trips{% endif %}: {% for p in owner_missing %}<code>{{ p }}</code> {% endfor %}</p>
+  {% if immich_oauth %}
+  <form method="post" action="/setup/immich/connect">
+    <input type="hidden" name="csrf" value="{{ session.csrf }}"><input type="hidden" name="feed_id" value="{{ raw.id }}">
+    <button class="primary">Allow it: connect with Immich again</button>
+  </form>
+  {% else %}<p>Create a new key with these permissions too and paste it under “Immich key” below.</p>{% endif %}
+</div>
+{% endif %}
 {% if skipped %}<p class="notice error" role="alert">Photos by {{ skipped | join(", ") }} aren't sent: Immich only lets a photo's owner record that it was sent. Connect them under “Co-parents” below.</p>{% endif %}
 {% if feed and feed.refused_keys %}<p class="notice error" role="alert">Immich refused {{ feed.refused_keys }} co-parent key(s), probably revoked. Add a new key under “Co-parents” below.</p>{% endif %}
 <section class="panel">
   <p><b>To share a photo:</b> add it to the album in Immich{% if raw.require_caption is not false %} and write a description{% endif %}.
     Everyone below gets it at {{ raw.send_time }} the next morning. Each photo is sent only once.</p>
+  <p><a class="button" href="/setup/f/{{ raw.id }}/open">👀 See the feed as you</a>
+    <span class="hint">and like and comment there in your own name</span></p>
   <form method="post" action="/setup/f/{{ raw.id }}/test" class="inline">
     <input type="hidden" name="csrf" value="{{ session.csrf }}">
     <button class="secondary">Send me a test email</button>
@@ -158,10 +171,13 @@
     {% for c in coparents %}
     <li>{% if c.name is defined %}<b>{{ c.name }}</b> <span class="hint">{{ c.email }}</span>{% set uid = c.id %}
       {% else %}<b>Not in the album anymore</b>{% set uid = c %}{% endif %} <span class="tag ok">connected</span>
+      {% if uid in outdated %}<span class="tag wait">can't comment yet</span>{% endif %}
       <form method="post" action="/setup/f/{{ raw.id }}/coparents/remove" class="inline"
             onsubmit='return confirm({{ ("Remove " ~ (c.name if c.name is defined else "this co-parent") ~ "? Their photos stop being sent. Their access to the album in Immich stays as it is.") | tojson }})'>
         <input type="hidden" name="csrf" value="{{ session.csrf }}"><input type="hidden" name="user_id" value="{{ uid }}">
-        <button class="link">remove</button></form></li>
+        <button class="link">remove</button></form>
+      {% if uid in outdated %}<div class="invite">Their key is from before co-parents could like and comment on the feed{% if outdated[uid] %}. Send {{ c.name }} this link to renew it (valid {{ invite_days }} days):
+        <input readonly value="{{ outdated[uid] }}" onclick="this.select()" aria-label="Invite link for {{ c.name }}">{% else %}: add a new key of theirs below, with the permissions listed there.{% endif %}</div>{% endif %}</li>
     {% endfor %}
     {% for w in waiting_coparents %}
     <li><b>{{ w.name }}</b> <span class="hint">{{ w.email }}</span> <span class="tag wait">not connected</span>

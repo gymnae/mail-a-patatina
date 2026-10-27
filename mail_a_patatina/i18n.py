@@ -1040,6 +1040,62 @@ _TEXTS: dict[str, tuple[str, str, str, str, str]] = {  # English: (German, Frenc
         "Takaisin luonnokseksi",
         "Снова в черновик",
         "Знову в чернетку"),
+    "{name} commented": (
+        "{name} hat kommentiert",
+        "{name} a commenté",
+        "{name} kommentoi",
+        "{name} оставил(а) комментарий",
+        "{name} залишив(-ла) коментар"),
+    "Reply": ("Antworten", "Répondre", "Vastaa", "Ответить", "Відповісти"),
+    "You get this email because comments in {title} are sent to you.": (
+        "Du bekommst diese E-Mail, weil dir Kommentare in {title} geschickt werden.",
+        "Vous recevez cet e-mail parce que les commentaires de {title} vous sont envoyés.",
+        "Saat tämän sähköpostin, koska sinulle lähetetään kommentit kohteesta {title}.",
+        "Вы получили это письмо, потому что вам присылают комментарии в «{title}».",
+        "Ви отримали цей лист, бо вам надсилають коментарі в «{title}»."),
+    "Switch it off in the settings": (
+        "In den Einstellungen abschalten",
+        "Désactiver dans les réglages",
+        "Kytke pois asetuksista",
+        "Отключить в настройках",
+        "Вимкнути в налаштуваннях"),
+    "Stop these emails": (
+        "Diese E-Mails abbestellen",
+        "Ne plus recevoir ces e-mails",
+        "Lopeta nämä sähköpostit",
+        "Отписаться от этих писем",
+        "Відписатися від цих листів"),
+    "Stop the emails about comments?": (
+        "Keine E-Mails mehr zu Kommentaren?",
+        "Ne plus recevoir d'e-mails sur les commentaires ?",
+        "Lopetetaanko sähköpostit kommenteista?",
+        "Больше не присылать письма о комментариях?",
+        "Більше не надсилати листи про коментарі?"),
+    "{email} won't get any more emails when someone comments in {title}. You still see the comments on the website.": (
+        "{email} bekommt keine E-Mails mehr, wenn jemand in {title} kommentiert. Auf der Website siehst du die Kommentare weiterhin.",
+        "{email} ne recevra plus d'e-mail quand quelqu'un commente dans {title}. Les commentaires restent visibles sur le site.",
+        "{email} ei saa enää sähköpostia, kun joku kommentoi kohteessa {title}. Näet kommentit edelleen verkkosivulla.",
+        "На {email} больше не будут приходить письма о новых комментариях в «{title}». Комментарии по-прежнему видны на сайте.",
+        "На {email} більше не надходитимуть листи про нові коментарі в «{title}». Коментарі й далі видно на сайті."),
+    "You won't get emails about new comments anymore.": (
+        "Du bekommst keine E-Mails mehr zu neuen Kommentaren.",
+        "Vous ne recevrez plus d'e-mails sur les nouveaux commentaires.",
+        "Et saa enää sähköposteja uusista kommenteista.",
+        "Вы больше не будете получать письма о новых комментариях.",
+        "Ви більше не отримуватимете листів про нові коментарі."),
+    "See the feed": ("Zum Feed", "Voir le fil", "Katso syötettä", "Открыть ленту", "Відкрити стрічку"),
+    "Mail-A-Patatina isn't allowed to like and comment in your name yet. Connect it with Immich again on the "
+    "setup page, or ask for a new invite link.": (
+        "Mail-A-Patatina darf noch nicht in deinem Namen liken und kommentieren. Verbinde es auf der "
+        "Einrichtungsseite neu mit Immich oder bitte um einen neuen Einladungslink.",
+        "Mail-A-Patatina n'a pas encore le droit d'aimer et de commenter en votre nom. Reconnectez-le à Immich "
+        "sur la page de configuration, ou demandez un nouveau lien d'invitation.",
+        "Mail-A-Patatina ei vielä saa tykätä ja kommentoida nimissäsi. Yhdistä se Immichiin uudelleen "
+        "asetussivulla tai pyydä uusi kutsulinkki.",
+        "Mail-A-Patatina пока не может ставить лайки и комментировать от вашего имени. Подключите его к Immich "
+        "заново на странице настройки или попросите новую ссылку-приглашение.",
+        "Mail-A-Patatina поки не може ставити вподобання й коментувати від вашого імені. Підключіть його до "
+        "Immich знову на сторінці налаштування або попросіть нове посилання-запрошення."),
     "Preview": ("Vorschau", "Aperçu", "Esikatselu", "Предпросмотр", "Попередній перегляд"),
     "How will it look?": (
         "Wie sieht das aus?",

@@ -34,6 +34,8 @@ def family(settings, oma, monkeypatch, tmp_path):
     cfg = NS(id="falks", title="Die Falks", keep_photos_on_server=True, chats=[], bot_email="bot@x.invalid",
              smtp_from="Die Falks <f@example.com>", admin_emails=[], album_id="album")
     feed = NS(id="falks", cfg=cfg, members={oma.id: oma}, bot=None, library=Library(), journal=Journal(None),
+              act_as=lambda member, action: web.core.people.run_as(member, action),
+              others=lambda: [oma], is_coparent=lambda member: False,
               activities=no_activities, by_email=lambda email: oma if email == oma.email else None)
     saved, sent = [], []
 
