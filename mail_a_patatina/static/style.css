@@ -73,7 +73,7 @@ figure { margin: 0; }
 .zoomable.zooming, .zoomable.zooming * { touch-action: none; -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
 .zooming .live video { display: none; }
 .loupe {
-  position: absolute; top: 0; left: 0; z-index: 20; will-change: transform; width: min(260px, 54vw); height: min(260px, 54vw); border-radius: 50%; pointer-events: none;
+  position: absolute; top: 0; left: 0; z-index: 20; will-change: transform; width: min(260px, 62vw); height: min(260px, 62vw); border-radius: 50%; pointer-events: none;
   border: 3px solid #fff; box-shadow: 0 4px 18px rgba(0, 0, 0, .35); background: no-repeat border-box var(--chip);
 }
 .loupe[hidden] { display: none; }
