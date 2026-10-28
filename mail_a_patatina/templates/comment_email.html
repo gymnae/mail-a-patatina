@@ -43,7 +43,7 @@
   </td></tr>
   <tr><td align="center" style="padding:8px 4px 0;font-size:13px;color:#7a6f66;line-height:1.6;">
     {% if name %}{{ _("These links sign you in as {name} for {days} days, so please don't forward this email.", name=name, days=link_days) }}<br>{% endif %}
-    {{ _("You get this email because comments in {title} are sent to you.", title=title) }}
+    {{ _("You get this email because comments and likes in {title} are sent to you.", title=title) }}
     {% if settings_url %}<br><a href="{{ settings_url }}" style="color:#a39a91;">{{ _("Switch it off in the settings") }}</a>{% endif %}
     {% if off_url %}<br><a href="{{ off_url }}" style="color:#a39a91;">{{ _("Stop these emails") }}</a>{% endif %}
   </td></tr>

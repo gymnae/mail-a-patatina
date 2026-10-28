@@ -31,6 +31,8 @@ T = TypeVar("T")
 class NotConnected(Exception):
     """The owner or a co-parent wants to like or comment, but their key here isn't allowed to (yet)."""
 
+LIKES_AFTER_HOURS = 12  # the family's likes email goes out this long after the daily one
+
 
 class Feed:
     def __init__(self, core: Core, cfg: FeedConfig):
@@ -158,6 +160,7 @@ class Core:
         self.store = FeedStore(settings.setup_dir)
         self.feeds: dict[str, Feed] = {cfg.id: Feed(self, cfg) for cfg in load_feeds(settings)}
         self.scheduler = None  # set by the web app; the CLI runs without one
+        self.likes_job: Callable[[Feed], Awaitable[None]] | None = None  # set by the web app: the family's likes email
 
     def schedule(self, feed: Feed) -> None:
         if self.scheduler is None:
@@ -169,13 +172,20 @@ class Core:
             feed.dispatch, CronTrigger(hour=hour, minute=minute, timezone=feed.cfg.timezone),
             id=f"dispatch-{feed.id}", coalesce=True, max_instances=1, misfire_grace_time=3600, replace_existing=True,
         )
+        if self.likes_job is not None:
+            # Half a day after the daily email: the day's likes have come in by then, and it's evening.
+            self.scheduler.add_job(
+                self.likes_job, CronTrigger(hour=(hour + LIKES_AFTER_HOURS) % 24, minute=minute, timezone=feed.cfg.timezone),
+                args=[feed], id=f"likes-{feed.id}", coalesce=True, max_instances=1, misfire_grace_time=3600,
+                replace_existing=True,
+            )
 
     async def apply_stored(self, feed_id: str) -> Feed | None:
         """(Re)load one family saved by the setup page, or drop it if it was deleted."""
         old = self.feeds.pop(feed_id, None)
         if old is not None:
             if self.scheduler is not None:
-                for job in (f"sync-{feed_id}", f"dispatch-{feed_id}"):
+                for job in (f"sync-{feed_id}", f"dispatch-{feed_id}", f"likes-{feed_id}"):
                     if self.scheduler.get_job(job):
                         self.scheduler.remove_job(job)
             await old.aclose()

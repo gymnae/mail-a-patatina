@@ -7,7 +7,7 @@ Everyone who can sign in to Immich can set up their own family feed at `PUBLIC_U
    - it must belong to the same email address,
    - it must have exactly what the feed needs,
    - it must not be able to administer Immich or delete anything, except take people out of the album (`albumUser.delete`).
-3. **Album and rules:** pick one of your own albums, a title, the sending time and timezone, digest or one-a-day, whether only captioned photos go out, and whether you want an email when someone comments.
+3. **Album and rules:** pick one of your own albums, a title, the sending time and timezone, digest or one-a-day, whether only captioned photos go out, and whether you want emails about comments and likes.
 4. **People and chats:**
    - Add relatives by name and email.
    - Requests from people who opened a relative's link (e.g. a forwarded email) and clicked **Not …?** show up here as "asks to join": **add** them like any relative, or **decline**.
@@ -47,11 +47,16 @@ The owner and the co-parents don't get the daily email, but they can look at the
 - **A co-parent** is signed in on the website right after accepting the invite link. Later they sign in to `PUBLIC_URL/setup/` with their own account, where the feed is listed under *Feeds you add photos to*.
 - **Keys from before this existed** can't like or comment yet. The setup page says so: the owner connects with Immich again (or pastes a key that also has `activity.create` and `activity.delete`), and co-parents get a fresh invite link shown next to their name.
 
-## Emails about comments
+## Emails about comments and likes
 
-Every new comment is emailed to the family, in the daily email's look: the photo, who wrote what, and a **Reply** button. The button signs them in on the website as themselves, so the answer goes out in their name. Nobody is emailed about their own comments.
+The family hears about what the relatives say, in the daily email's look:
 
-- **The owner** gets them with *email me when someone comments* switched on in the settings.
+- **Comments, right away,** so there's time to answer: the photo, who wrote what, and a **Reply** button. The button signs them in on the website as themselves, so the answer goes out in their name.
+- **Likes, once a day,** half a day after the daily email (at 19:00 when it goes out at 07:00): every photo liked in the 24 hours before, who liked it, and a link to it. No new likes, no email.
+
+Nobody is emailed about their own comments or likes.
+
+- **The owner** gets them with *email me about comments and likes* switched on in the settings.
 - **Co-parents** get them too, and can stop them with **Stop these emails** at the bottom of each one.
 - **Families in `feeds.yml`:** they go to `admin_emails` only, because there's nowhere to store a co-parent's choice.
 

@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="{{ lang }}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>{{ title }}</title>
+</head>
+<body style="margin:0;padding:0;background:#f4f1ec;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#2b2622;">
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f4f1ec;">
+<tr><td align="center" style="padding:24px 12px;">
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:600px;">
+  <tr><td style="padding:0 4px 18px;">
+    <table role="presentation" cellspacing="0" cellpadding="0"><tr>
+      <td style="padding-right:12px;"><img src="cid:{{ logo_cid }}" width="60" height="60" alt="" style="display:block;border:0;"></td>
+      <td style="font-size:20px;font-weight:700;color:#5a3a1c;">{{ title }}<div style="font-size:15px;font-weight:400;color:#7a6f66;padding-top:2px;">{{ _("New likes") }} {{ like }}</div></td>
+    </tr></table>
+  </td></tr>
+  <tr><td style="padding-bottom:24px;">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#ffffff;border-radius:14px;overflow:hidden;">
+      {% for p in photos %}
+      <tr><td style="padding:16px 16px {{ '16px' if loop.last else '0' }};">
+        <a href="{{ p.url }}" style="display:block;color:#2b2622;text-decoration:none;">
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr>
+          <td width="96" valign="top" style="width:96px;padding-right:14px;">
+            {% if p.image_cid %}<img src="cid:{{ p.image_cid }}" width="96" height="96" alt="{{ p.what }}" style="display:block;width:96px;height:96px;object-fit:cover;border-radius:10px;border:0;">
+            {% else %}<div style="width:96px;height:96px;border-radius:10px;background:#ece7e0;"></div>{% endif %}
+          </td>
+          <td valign="middle">
+            <div style="font-size:16px;line-height:1.35;">{{ p.what }}</div>
+            <div style="font-size:15px;line-height:1.4;color:#7a6f66;padding-top:6px;">{{ like }} {{ p.names | join(", ") }}</div>
+            <div style="font-size:14px;padding-top:8px;color:#5a3a1c;font-weight:600;">{{ _("Open") }} →</div>
+          </td>
+        </tr></table>
+        </a>
+      </td></tr>
+      {% if not loop.last %}<tr><td style="padding:16px 16px 0;"><div style="border-top:1px solid #e2dcd4;font-size:0;line-height:0;">&nbsp;</div></td></tr>{% endif %}
+      {% endfor %}
+    </table>
+  </td></tr>
+  <tr><td align="center" style="padding:8px 4px 0;font-size:13px;color:#7a6f66;line-height:1.6;">
+    {% if name %}{{ _("These links sign you in as {name} for {days} days, so please don't forward this email.", name=name, days=link_days) }}<br>{% endif %}
+    {{ _("You get this email because comments and likes in {title} are sent to you.", title=title) }}
+    {% if settings_url %}<br><a href="{{ settings_url }}" style="color:#a39a91;">{{ _("Switch it off in the settings") }}</a>{% endif %}
+    {% if off_url %}<br><a href="{{ off_url }}" style="color:#a39a91;">{{ _("Stop these emails") }}</a>{% endif %}
+  </td></tr>
+</table>
+</td></tr>
+</table>
+</body>
+</html>

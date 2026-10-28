@@ -1047,12 +1047,19 @@ _TEXTS: dict[str, tuple[str, str, str, str, str]] = {  # English: (German, Frenc
         "{name} оставил(а) комментарий",
         "{name} залишив(-ла) коментар"),
     "Reply": ("Antworten", "Répondre", "Vastaa", "Ответить", "Відповісти"),
-    "You get this email because comments in {title} are sent to you.": (
-        "Du bekommst diese E-Mail, weil dir Kommentare in {title} geschickt werden.",
-        "Vous recevez cet e-mail parce que les commentaires de {title} vous sont envoyés.",
-        "Saat tämän sähköpostin, koska sinulle lähetetään kommentit kohteesta {title}.",
-        "Вы получили это письмо, потому что вам присылают комментарии в «{title}».",
-        "Ви отримали цей лист, бо вам надсилають коментарі в «{title}»."),
+    "You get this email because comments and likes in {title} are sent to you.": (
+        "Du bekommst diese E-Mail, weil dir Kommentare und Likes in {title} geschickt werden.",
+        "Vous recevez cet e-mail parce que les commentaires et les « j'aime » de {title} vous sont envoyés.",
+        "Saat tämän sähköpostin, koska sinulle lähetetään kommentit ja tykkäykset kohteesta {title}.",
+        "Вы получили это письмо, потому что вам присылают комментарии и лайки в «{title}».",
+        "Ви отримали цей лист, бо вам надсилають коментарі та вподобання в «{title}»."),
+    "New likes": (
+        "Neue Likes",
+        "Nouveaux « j'aime »",
+        "Uusia tykkäyksiä",
+        "Новые лайки",
+        "Нові вподобання"),
+    "Open": ("Öffnen", "Ouvrir", "Avaa", "Открыть", "Відкрити"),
     "Switch it off in the settings": (
         "In den Einstellungen abschalten",
         "Désactiver dans les réglages",
@@ -1065,24 +1072,24 @@ _TEXTS: dict[str, tuple[str, str, str, str, str]] = {  # English: (German, Frenc
         "Lopeta nämä sähköpostit",
         "Отписаться от этих писем",
         "Відписатися від цих листів"),
-    "Stop the emails about comments?": (
-        "Keine E-Mails mehr zu Kommentaren?",
-        "Ne plus recevoir d'e-mails sur les commentaires ?",
-        "Lopetetaanko sähköpostit kommenteista?",
-        "Больше не присылать письма о комментариях?",
-        "Більше не надсилати листи про коментарі?"),
-    "{email} won't get any more emails when someone comments in {title}. You still see the comments on the website.": (
-        "{email} bekommt keine E-Mails mehr, wenn jemand in {title} kommentiert. Auf der Website siehst du die Kommentare weiterhin.",
-        "{email} ne recevra plus d'e-mail quand quelqu'un commente dans {title}. Les commentaires restent visibles sur le site.",
-        "{email} ei saa enää sähköpostia, kun joku kommentoi kohteessa {title}. Näet kommentit edelleen verkkosivulla.",
-        "На {email} больше не будут приходить письма о новых комментариях в «{title}». Комментарии по-прежнему видны на сайте.",
-        "На {email} більше не надходитимуть листи про нові коментарі в «{title}». Коментарі й далі видно на сайті."),
-    "You won't get emails about new comments anymore.": (
-        "Du bekommst keine E-Mails mehr zu neuen Kommentaren.",
-        "Vous ne recevrez plus d'e-mails sur les nouveaux commentaires.",
-        "Et saa enää sähköposteja uusista kommenteista.",
-        "Вы больше не будете получать письма о новых комментариях.",
-        "Ви більше не отримуватимете листів про нові коментарі."),
+    "Stop the emails about comments and likes?": (
+        "Keine E-Mails mehr zu Kommentaren und Likes?",
+        "Ne plus recevoir d'e-mails sur les commentaires et les « j'aime » ?",
+        "Lopetetaanko sähköpostit kommenteista ja tykkäyksistä?",
+        "Больше не присылать письма о комментариях и лайках?",
+        "Більше не надсилати листи про коментарі та вподобання?"),
+    "{email} won't get any more emails about comments and likes in {title}. You still see them on the website.": (
+        "{email} bekommt keine E-Mails mehr zu Kommentaren und Likes in {title}. Auf der Website siehst du sie weiterhin.",
+        "{email} ne recevra plus d'e-mails sur les commentaires et les « j'aime » dans {title}. Ils restent visibles sur le site.",
+        "{email} ei saa enää sähköposteja kommenteista ja tykkäyksistä kohteessa {title}. Näet ne edelleen verkkosivulla.",
+        "На {email} больше не будут приходить письма о комментариях и лайках в «{title}». На сайте они по-прежнему видны.",
+        "На {email} більше не надходитимуть листи про коментарі та вподобання в «{title}». На сайті їх і далі видно."),
+    "You won't get emails about comments and likes anymore.": (
+        "Du bekommst keine E-Mails mehr zu Kommentaren und Likes.",
+        "Vous ne recevrez plus d'e-mails sur les commentaires et les « j'aime ».",
+        "Et saa enää sähköposteja kommenteista ja tykkäyksistä.",
+        "Вы больше не будете получать письма о комментариях и лайках.",
+        "Ви більше не отримуватимете листів про коментарі та вподобання."),
     "See the feed": ("Zum Feed", "Voir le fil", "Katso syötettä", "Открыть ленту", "Відкрити стрічку"),
     "Mail-A-Patatina isn't allowed to like and comment in your name yet. Connect it with Immich again on the "
     "setup page, or ask for a new invite link.": (
