@@ -718,11 +718,22 @@ def _recent_likes(activities: list[dict], since: dt.datetime) -> dict[str, list[
 
 
 async def _liked(feed: Feed, since: dt.datetime) -> list[Liked]:
-    """The feed's photos liked since `since`."""
+    """The feed's photos liked since `since`, then the trips' (each trip's likes are in its own album)."""
     out = []
     for asset_id, likes in _recent_likes(await feed.activities(), since).items():
         if (entry := feed.library.get(asset_id)) is not None:
             out.append(Liked(asset_id, likes, f"/{feed.id}/e/{asset_id}", entry.caption, entry.taken_at))
+    for trip in feed.journal.trips.values():
+        try:
+            recent = _recent_likes(await trip.activity.get(), since) if trip.activity else {}
+        except Exception:
+            log.exception("Feed %s: reading the likes of trip %s failed", feed.id, trip.slug)
+            continue
+        for post in trip.posts:
+            for m in post.media:
+                if likes := recent.pop(m.asset_id, None):
+                    out.append(Liked(m.asset_id, likes, f"/{feed.id}/trips/{trip.slug}/{post.slug}/{m.asset_id}",
+                                     " · ".join(filter(None, [trip.title, m.caption or post.title])), post.when))
     return out
 
 

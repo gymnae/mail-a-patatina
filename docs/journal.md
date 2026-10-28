@@ -4,7 +4,7 @@ Next to the daily feed, a family can keep a travel journal: one page per trip, e
 
 - **The text lives in Markdown files**, not in Immich and not in a database. They're plain files you can read, edit, copy, put in Git or turn into a printed photo book without Mail-A-Patatina.
 - **The photos and videos stay in Immich.** Entries point to them by their Immich id.
-- **Each trip is one Immich album.** The people it's shared with may read the trip. Their likes and comments on its photos are that album's Immich activity, posted as their own accounts like on the feed, so you see them in the Immich app. They stay apart from the feed's: a photo that's in both the feed and a trip has two separate sets of likes and comments.
+- **Each trip is one Immich album.** The people it's shared with may read the trip. Their likes and comments on its photos are that album's Immich activity, posted as their own accounts like on the feed, so you see them in the Immich app. They stay apart from the feed's: a photo that's in both the feed and a trip has two separate sets of likes and comments. The family is emailed about them like about the feed's: comments right away, likes in the same daily likes email (see [families](families.md#emails-about-comments-and-likes)).
 - **The text itself has no likes or comments**, only its photos do.
 
 Relatives use the links from their feed emails; there's nothing new to sign in to. The **Trips** menu shows up once at least one trip's album is shared with them.

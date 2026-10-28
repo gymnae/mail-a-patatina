@@ -192,3 +192,25 @@ def test_likes_and_comments_go_to_the_trips_album(client, signed_in):
     assert r.status_code == 303 and "So cute!" not in client.get(base).text
     client.post(f"{base}/like")  # toggles it off again
     assert signed_in.activities_by_album["trip-album"] == []
+
+
+def test_likes_on_trip_photos_join_the_familys_likes_email(client, signed_in, family, oma, monkeypatch):
+    when = web.dt.datetime.now(web.dt.timezone.utc) - web.dt.timedelta(hours=2)
+    liked = {"id": "l1", "type": "like", "assetId": A1, "createdAt": when.isoformat(),
+             "user": {"id": oma.id, "name": oma.name, "email": oma.email}}
+
+    async def trip_likes():
+        return [liked, {**liked, "id": "l2", "assetId": OUTSIDE}]  # not part of an entry: left out
+
+    async def jpeg(_curator, asset_id, size):
+        return b"\xff\xd8jpeg"
+
+    family.feed.journal.trips["2026-08-lapland"].activity = NS(get=trip_likes)
+    family.feed.cfg.admin_emails = ["mama@example.com"]
+    monkeypatch.setattr(web.core, "media", NS(jpeg=jpeg), raising=False)
+    asyncio.run(web.tell_about_likes(family.feed))
+    (msg,) = family.sent
+    html = msg.get_body(("html",)).get_content()
+    assert "Lapland · Feeding time" in html and "Oma Erika" in html
+    assert f'href="http://testserver/falks/trips/2026-08-lapland/2026-08-04-reindeer/{A1}"' in html
+    assert OUTSIDE not in html
