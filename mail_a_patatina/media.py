@@ -8,15 +8,20 @@ import logging
 from collections import defaultdict
 from pathlib import Path
 
+import pillow_heif
 from PIL import Image, ImageOps
 
 from .immich import Immich
 
 log = logging.getLogger(__name__)
+pillow_heif.register_heif_opener()  # iPhones' originals
 
-# our size name -> (Immich rendition, longest edge in px). "large" is for zooming in on a photo's own page, made
-# from the full-size picture (needs Immich 1.127 or later); where there's none, it's the preview after all.
-SIZES = {"thumb": ("thumbnail", 480), "preview": ("preview", 1600), "large": ("fullsize", 2560)}
+# our size name -> (Immich renditions, the first that works; longest edge in px). "large" is for zooming in on a
+# photo's own page, made from the original. For a HEIC, Immich's own "fullsize" is just the preview, unless
+# Immich is set to make full-size pictures; so that only stands in for originals we can't read (RAW).
+SIZES = {"thumb": (["thumbnail"], 480), "preview": (["preview"], 1600), "large": (["original", "fullsize", "preview"], 2560)}
+# The file a size is cached in; renamed when the size is made differently, so it's made again.
+FILES = {"large": "large-2"}
 
 
 def _to_jpeg(raw: bytes, max_edge: int) -> bytes:
@@ -36,25 +41,30 @@ class MediaCache:
     def __init__(self, root: Path):
         self.root = root
         self.root.mkdir(parents=True, exist_ok=True)
+        for old in self.root.glob("*-large.jpg"):  # made from the preview only
+            old.unlink(missing_ok=True)
         self._locks: defaultdict[str, asyncio.Lock] = defaultdict(asyncio.Lock)
 
     async def jpeg(self, immich: Immich, asset_id: str, size: str) -> bytes:
         """`immich` must be allowed to see the asset (its feed's curator); callers check feed membership."""
-        immich_size, max_edge = SIZES[size]
-        path = self.root / f"{asset_id}-{size}.jpg"
+        renditions, max_edge = SIZES[size]
+        path = self.root / f"{asset_id}-{FILES.get(size, size)}.jpg"
         async with self._locks[path.name]:
             if path.exists():
                 return path.read_bytes()
-            try:
-                raw = await immich.thumbnail(asset_id, immich_size)
-                data = await asyncio.to_thread(_to_jpeg, raw, max_edge)
-            except Exception:
-                if size != "large":
-                    raise
-                # An older Immich, or an original we can't read (HEIC): the preview will do.
-                log.info("no full-size picture of %s, using the preview", asset_id, exc_info=True)
-                raw = await immich.thumbnail(asset_id, "preview")
-                data = await asyncio.to_thread(_to_jpeg, raw, max_edge)
+            for rendition in renditions:
+                try:
+                    if rendition == "original":
+                        raw = await immich.original(asset_id)
+                    else:
+                        raw = await immich.thumbnail(asset_id, rendition)
+                    data = await asyncio.to_thread(_to_jpeg, raw, max_edge)
+                    break
+                except Exception:
+                    if rendition == renditions[-1]:
+                        raise
+                    # Not allowed to download it, an older Immich, or a picture we can't read: the next one.
+                    log.info("no %s picture of %s", rendition, asset_id, exc_info=True)
             tmp = path.with_suffix(".tmp")
             tmp.write_bytes(data)
             tmp.replace(path)
