@@ -182,6 +182,11 @@ class Immich:
         r.raise_for_status()
         return r.content
 
+    async def original(self, asset_id: str) -> bytes:
+        r = await self.http.get(f"/assets/{asset_id}/original")
+        r.raise_for_status()
+        return r.content
+
     async def open_video(self, asset_id: str, range_header: str | None) -> httpx.Response:
         """Start streaming a video; the caller must close the response."""
         headers = {"Range": range_header} if range_header else {}
