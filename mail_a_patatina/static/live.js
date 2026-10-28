@@ -5,7 +5,7 @@ for (const box of document.querySelectorAll(".live")) {
   let held = false;
 
   const play = () => {
-    if (box.closest(".zooming")) return;  // looking through the loupe at the still
+    if (box.closest(".zooming, .zoomed")) return;  // looking closely at the still
     video.play().then(() => box.classList.add("playing")).catch(() => {});
   };
   const stop = () => {
@@ -45,10 +45,10 @@ if (document.body.classList.contains("protect")) {
   document.addEventListener("contextmenu", (e) => { if (e.target.closest("video")) e.preventDefault(); });
 }
 
-// A loupe for looking closer at a photo: a click or tap on it turns it on, another turns it off. Under the mouse or
-// finger lies a small lens showing the patch the loupe shows; the loupe itself floats just above it, or beside it
-// where there's no room above, and glides over when it changes sides. Both show the same picture the page does,
-// so there's nothing new to save.
+// A loupe for looking closer at a photo with the mouse: a click turns it on, another turns it off. Under the mouse
+// lies a small lens showing the patch the loupe shows; the loupe itself floats just above it, or beside it where
+// there's no room above, and glides over when it changes sides. Both show the same picture the page does, so
+// there's nothing new to save. (Fingers zoom the photo itself instead, like in a photos app: see below.)
 for (const figure of document.querySelectorAll(".zoomable")) {
   const img = figure.querySelector("img");
   const loupe = document.createElement("div");
@@ -58,10 +58,7 @@ for (const figure of document.querySelectorAll(".zoomable")) {
   loupe.hidden = lens.hidden = true;
   document.body.append(lens, loupe);
   let on = false;
-  let down = null;   // where a finger or pen touched, so a drag doesn't also count as a tap
-  let dragged = false;
-  let touch = false; // whether the last pointer was a finger or pen, not a mouse
-  let touched = 0;   // when a finger last let go: iOS follows a touch with mouse events, which must not move the loupe
+  let touched = 0;   // when a finger last let go: iOS follows a touch with mouse events, which mustn't open the loupe
   let last = null;   // the latest pointer, drawn on the next frame
   let frame = 0;
   let side = null;   // where the loupe rests: "above", "left" or "right"
@@ -130,24 +127,14 @@ for (const figure of document.querySelectorAll(".zoomable")) {
   const toggle = (value) => {
     on = value;
     figure.classList.toggle("zooming", on);
-    if (!on) return hide();
-    // A finger on the photo won't scroll while the loupe is on, so slide all of it into view first: links to the
-    // comments (from emails, or after commenting) can open the page with the top of the photo above the screen.
-    const r = img.getBoundingClientRect();
-    const height = window.visualViewport ? visualViewport.height : innerHeight;
-    if (touch && (r.top < 0 || r.bottom > height)) {
-      img.scrollIntoView({ block: r.height < height ? "center" : "start", behavior: "smooth" });
-    }
+    if (!on) hide();
   };
   const draw = () => {
     frame = 0;
     const r = img.getBoundingClientRect();
-    let x = last.x - r.left;
-    let y = last.y - r.top;
-    if (!touch && (x < 0 || y < 0 || x > r.width || y > r.height)) return hide();
-    // A finger that strays past the edge keeps the loupe at the edge instead of flickering it away.
-    x = Math.min(Math.max(x, 0), r.width);
-    y = Math.min(Math.max(y, 0), r.height);
+    const x = last.x - r.left;
+    const y = last.y - r.top;
+    if (x < 0 || y < 0 || x > r.width || y > r.height) return hide();
     const src = `url("${img.currentSrc || img.src}")`;
     const appearing = loupe.hidden;
     loupe.hidden = lens.hidden = false;
@@ -159,9 +146,9 @@ for (const figure of document.querySelectorAll(".zoomable")) {
     loupe.style.backgroundSize = `${r.width * zoom}px ${r.height * zoom}px`;
     loupe.style.backgroundPosition = `${size / 2 - x * zoom}px ${size / 2 - y * zoom}px`;
 
-    // The lens: shows what the loupe shows; around a finger bigger than that patch, under a mouse smaller.
+    // The lens: shows what the loupe shows, a little smaller than that patch.
     const patch = size / zoom;
-    const d = touch ? Math.max(patch * 1.6, 72) : Math.max(patch * 0.8, 56);
+    const d = Math.max(patch * 0.8, 56);
     const n = Math.round(d * Math.min(devicePixelRatio || 1, 2));
     lens.style.width = lens.style.height = `${d}px`;
     if (lens.width !== n) lens.width = lens.height = n;
@@ -201,8 +188,6 @@ for (const figure of document.querySelectorAll(".zoomable")) {
     loupe.style.transform = `translate3d(${left + scrollX}px, ${top + scrollY}px, 0)`;
   };
   const show = (e) => {
-    if (e.pointerType === "mouse" && Date.now() - touched < 1000) return;
-    touch = e.pointerType !== "mouse";
     last = { x: e.clientX, y: e.clientY };
     if (!frame) frame = requestAnimationFrame(draw);
   };
@@ -215,33 +200,102 @@ for (const figure of document.querySelectorAll(".zoomable")) {
   };
 
   figure.addEventListener("click", (e) => {
-    if (e.defaultPrevented || dragged) return;  // a held live photo or a loupe drag, not a tap
+    // A held live photo, or any tap: fingers zoom the photo itself.
+    if (e.defaultPrevented || Date.now() - touched < 1000) return;
     toggle(!on);
-    if (on && !touch) show(e);
+    if (on) show(e);
   });
-  figure.addEventListener("pointerdown", (e) => {
-    if (e.pointerType === "mouse" && Date.now() - touched < 1000) return;
-    touch = e.pointerType !== "mouse";
-    down = [e.clientX, e.clientY];
-    dragged = false;
-    if (on && touch) show(e);
-  });
-  figure.addEventListener("pointermove", (e) => {
-    if (down && Math.hypot(e.clientX - down[0], e.clientY - down[1]) > 8) dragged = true;
-    if (on && (e.pointerType === "mouse" || down)) show(e);
-  });
-  // iOS doesn't always honour touch-action, so while the loupe is on, a finger on the photo never scrolls.
-  figure.addEventListener("touchmove", (e) => { if (on) e.preventDefault(); }, { passive: false });
-  const up = (e) => {
-    down = null;
-    if (e.pointerType !== "mouse") {
-      touched = Date.now();
-      hide();
-    }
-  };
-  figure.addEventListener("pointerup", up);
-  figure.addEventListener("pointercancel", up);
+  figure.addEventListener("touchend", () => { touched = Date.now(); });
+  figure.addEventListener("pointermove", (e) => { if (on && e.pointerType === "mouse") show(e); });
   figure.addEventListener("pointerleave", (e) => { if (e.pointerType === "mouse") hide(); });
   document.addEventListener("keydown", (e) => { if (e.key === "Escape" && on) toggle(false); });
-  window.addEventListener("scroll", () => { if (on && !down) hide(); }, { passive: true });
+  window.addEventListener("scroll", () => { if (on) hide(); }, { passive: true });
+}
+
+// Fingers zoom the photo in place, like in a photos app: a double tap zooms in on that spot and back out, two
+// fingers pinch, and one finger moves the zoomed photo around. At normal size a finger scrolls the page as usual,
+// and holding a live photo still plays it.
+for (const figure of document.querySelectorAll(".zoomable")) {
+  const photo = figure.firstElementChild;  // the image, or the live photo's box around it
+  const img = figure.querySelector("img");
+  let scale = 1;
+  let tx = 0;
+  let ty = 0;
+  let start = null;  // the zoom and fingers when the current gesture began
+  let tap = null;    // the last quick tap, to tell a double tap
+  let moved = false;
+
+  const set = (s, x, y, smooth = false) => {
+    const w = photo.offsetWidth;
+    const h = photo.offsetHeight;
+    scale = s;
+    // The photo always fills its frame: no empty space past its edges.
+    tx = Math.min(0, Math.max(w - w * s, x));
+    ty = Math.min(0, Math.max(h - h * s, y));
+    photo.classList.toggle("settling", smooth);
+    photo.style.transform = s === 1 ? "" : `translate3d(${tx}px, ${ty}px, 0) scale(${s})`;
+    figure.classList.toggle("zoomed", s > 1);
+  };
+  // As far as photo apps go: well past the picture's own sharpness, and at least four times.
+  const most = () => Math.max(4, (2 * img.naturalWidth) / photo.offsetWidth || 0);
+  // Where a finger is, on the photo as it lies unzoomed.
+  const at = (t) => {
+    const r = photo.getBoundingClientRect();
+    return { x: t.clientX - (r.left - tx), y: t.clientY - (r.top - ty) };
+  };
+  const middle = (ts) => {
+    const a = at(ts[0]);
+    const b = ts[1] ? at(ts[1]) : a;
+    return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2, d: Math.hypot(a.x - b.x, a.y - b.y) };
+  };
+  const begin = (e) => {
+    const m = middle(e.touches);
+    start = { scale, tx, ty, n: e.touches.length, ...m };
+  };
+
+  // Safari's own pinch would zoom the whole page instead.
+  figure.addEventListener("gesturestart", (e) => e.preventDefault());
+  figure.addEventListener("touchstart", (e) => {
+    if (e.touches.length === 1) moved = false;
+    else moved = true;  // a second finger: a pinch, not a tap
+    begin(e);
+  }, { passive: true });
+  figure.addEventListener("touchmove", (e) => {
+    if (!start) return;
+    // A second finger that came down beside the photo told only the page: start over from both fingers.
+    if (e.touches.length !== start.n) {
+      moved = true;
+      begin(e);
+    }
+    const m = middle(e.touches);
+    if (Math.hypot(m.x - start.x, m.y - start.y) > 8) moved = true;
+    if (e.touches.length < 2 && scale === 1) return;  // one finger on the photo at normal size: the page scrolls
+    e.preventDefault();
+    let s = scale;
+    if (e.touches.length >= 2 && start.d) s = Math.min(most(), Math.max(1, (start.scale * m.d) / start.d));
+    // The spot that was between the fingers stays between them.
+    const ux = (start.x - start.tx) / start.scale;
+    const uy = (start.y - start.ty) / start.scale;
+    set(s, m.x - ux * s, m.y - uy * s);
+  }, { passive: false });
+  figure.addEventListener("touchend", (e) => {
+    if (e.touches.length) return begin(e);  // one of two fingers lifted: carry on with the other
+    start = null;
+    if (moved || e.changedTouches.length !== 1) return (tap = null);
+    const t = e.changedTouches[0];
+    const now = Date.now();
+    if (tap && now - tap.time < 350 && Math.hypot(t.clientX - tap.x, t.clientY - tap.y) < 40) {
+      tap = null;
+      e.preventDefault();  // no click after it
+      if (scale > 1) return set(1, 0, 0, true);
+      const p = at(t);
+      const s = Math.min(most(), Math.max(2.5, img.naturalWidth / photo.offsetWidth || 0));
+      return set(s, p.x * (1 - s), p.y * (1 - s), true);
+    }
+    tap = { time: now, x: t.clientX, y: t.clientY };
+  });
+  figure.addEventListener("touchcancel", () => { start = null; });
+  photo.addEventListener("transitionend", () => photo.classList.remove("settling"));
+  // A new size of the page (turning the phone) starts over at normal size.
+  window.addEventListener("resize", () => { if (scale > 1) set(1, 0, 0); });
 }
