@@ -65,13 +65,18 @@ figure { margin: 0; }
   position: absolute; top: 10px; left: 10px; padding: 2px 8px; border-radius: 999px;
   background: rgba(0, 0, 0, .45); color: #fff; font-size: 12px; font-weight: 700; letter-spacing: .05em;
 }
-/* The loupe on a photo's own page (see live.js): a click or tap turns it on, then it follows the
-   mouse, or the finger while it's down. While it's on, the photo doesn't scroll the page under a finger. */
-.zoomable { touch-action: manipulation; }  /* tapping it on and off doesn't double-tap zoom the page */
+/* Looking closer at a photo on its own page (see live.js). Fingers zoom the photo in its frame: a finger
+   still scrolls the page, but double taps and pinches are the photo's, not the page's. Once zoomed in, a finger
+   moves the photo instead of the page. With a mouse, a click turns on the loupe, which follows it. */
+.zoomable { touch-action: pan-y; overflow: hidden; border-radius: 14px; isolation: isolate; }
+.zoomable > * { transform-origin: 0 0; }
+.zoomable > .settling { transition: transform .3s cubic-bezier(.25, .8, .25, 1); }
+.zoomable.zoomed, .zoomable.zoomed * { touch-action: none; -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
+.zoomed img { border-radius: 0; }
+.zoomed .live-badge { display: none; }
 .zoomable > img, .zoomable > .live { cursor: zoom-in; }
 .zoomable.zooming > img, .zoomable.zooming > .live { cursor: none; }  /* the lens is the pointer */
-.zoomable.zooming, .zoomable.zooming * { touch-action: none; -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
-.zooming .live video { display: none; }
+.zooming .live video, .zoomed .live video { display: none; }
 .loupe {
   position: absolute; top: 0; left: 0; z-index: 20; will-change: transform; width: min(260px, 62vw); height: min(260px, 62vw); border-radius: 50%; pointer-events: none;
   border: 3px solid #fff; box-shadow: 0 4px 18px rgba(0, 0, 0, .35); background: no-repeat border-box var(--chip);
