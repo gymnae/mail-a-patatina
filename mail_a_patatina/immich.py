@@ -153,7 +153,8 @@ class Immich:
                 return
 
     async def thumbnail(self, asset_id: str, size: str) -> bytes:
-        r = await self.http.get(f"/assets/{asset_id}/thumbnail", params={"size": size})
+        # "fullsize" of a photo browsers can show is the original itself, which Immich answers with a redirect.
+        r = await self.http.get(f"/assets/{asset_id}/thumbnail", params={"size": size}, follow_redirects=True)
         r.raise_for_status()
         return r.content
 

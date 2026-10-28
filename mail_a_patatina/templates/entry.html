@@ -7,12 +7,12 @@
     <video controls playsinline preload="none"{% if protect %} controlslist="nodownload"{% endif %} poster="{{ base }}/media/{{ entry.asset_id }}/preview" src="{{ base }}/video/{{ entry.asset_id }}"></video>
     {% elif entry.live_video_id %}
     <div class="live">
-      <img src="{{ base }}/media/{{ entry.asset_id }}/preview" alt="{{ entry.caption }}">
+      <img src="{{ base }}/media/{{ entry.asset_id }}/preview" data-large="{{ base }}/media/{{ entry.asset_id }}/large" alt="{{ entry.caption }}">
       <video muted playsinline loop preload="none" src="{{ base }}/video/{{ entry.asset_id }}" aria-hidden="true"></video>
       <span class="live-badge">LIVE</span>
     </div>
     {% else %}
-    <img src="{{ base }}/media/{{ entry.asset_id }}/preview" alt="{{ entry.caption }}">
+    <img src="{{ base }}/media/{{ entry.asset_id }}/preview" data-large="{{ base }}/media/{{ entry.asset_id }}/large" alt="{{ entry.caption }}">
     {% endif %}
   </figure>
   <p class="date">{{ entry.taken_at | nice_date }}</p>

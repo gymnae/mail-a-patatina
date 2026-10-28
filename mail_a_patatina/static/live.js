@@ -65,6 +65,16 @@ for (const figure of document.querySelectorAll(".zoomable")) {
   let glide = 0;
   let pixels = null; // the photo's pixels for the lens, once loaded; false where the browser won't hand them out
 
+  // The page shows the preview right away, then swaps in a sharper picture for looking closer once it's loaded.
+  if (img.dataset.large) {
+    const large = new Image();
+    large.onload = () => {
+      img.src = large.src;
+      pixels = null;
+    };
+    large.src = img.dataset.large;
+  }
+
   // The lens bends the photo like a glass lying on it: most magnified in the middle, bunching up towards the
   // rim, where the colours drift apart a little. Its rim shows exactly the patch the loupe shows.
   const bend = (x, y, patch) => {
