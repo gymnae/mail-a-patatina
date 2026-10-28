@@ -96,6 +96,32 @@ def build_comment(feed: FeedConfig, to: str, lang: str, ctx: dict, image: bytes 
     return msg
 
 
+def build_likes(feed: FeedConfig, to: str, lang: str, ctx: dict, images: dict[str, bytes]) -> EmailMessage:
+    """Tells the family about the day's likes in one email, in the daily email's look: each liked photo, who
+    liked it, and a link to it. `ctx`: photos ({asset_id, names, url, what}), name, link_days, settings_url,
+    off_url; `images`: each photo's thumbnail (empty if there's none)."""
+    domain = parseaddr(feed.smtp_from)[1].rpartition("@")[2] or None
+    logo_cid = make_msgid(domain=domain)
+    cids = {p["asset_id"]: make_msgid(domain=domain) for p in ctx["photos"] if images.get(p["asset_id"])}
+    ctx = {**ctx, "lang": lang, "title": feed.title, "logo_cid": logo_cid[1:-1], "like": LIKE,
+           "photos": [{**p, "image_cid": cids[p["asset_id"]][1:-1] if p["asset_id"] in cids else None}
+                      for p in ctx["photos"]]}
+    msg = EmailMessage()
+    msg["Subject"] = t(lang, "{title}: {subject}", title=feed.title, subject=t(lang, "New likes"))
+    msg["From"] = feed.smtp_from
+    msg["To"] = to
+    msg["Date"] = formatdate(localtime=True)
+    msg["Message-ID"] = make_msgid(domain=domain)
+    msg.set_content(_env.get_template("likes_email.txt").render(ctx))
+    msg.add_alternative(_env.get_template("likes_email.html").render(ctx), subtype="html")
+    html_part = msg.get_payload()[1]
+    html_part.add_related(LOGO, "image", "png", cid=logo_cid, filename="mail-a-patatina.png")
+    for asset_id, cid in cids.items():
+        html_part.add_related(images[asset_id], "image", "jpeg", cid=cid, filename=f"{asset_id[:8]}.jpg")
+    msg["Content-Language"] = lang  # last: set_content() drops Content-* headers
+    return msg
+
+
 def build_simple(sender: str, to: list[str], subject: str, body: str) -> EmailMessage:
     msg = EmailMessage()
     msg["Subject"] = subject

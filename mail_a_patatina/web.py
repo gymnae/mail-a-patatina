@@ -68,6 +68,7 @@ async def lifespan(app: FastAPI):
         log.exception("Immich not reachable yet")
     await core.sync_all()
     core.scheduler = AsyncIOScheduler()
+    core.likes_job = tell_about_likes
     for feed in core.feeds.values():
         core.schedule(feed)
     core.scheduler.start()
@@ -489,17 +490,44 @@ async def video(request: Request, feed_id: str, asset_id: str):
     )
 
 
-async def tell_about_comment(viewer: Viewer, asset_id: str, body: str, path: str, what: str | None) -> None:
-    """Emails the family a new comment, with the photo and a link to answer it: the feed's admin emails, and
-    the co-parents unless they switched it off. Their link signs them in on the website when they're in the
-    album, so they can reply in their own name."""
+def _family_addresses(feed: Feed) -> tuple[dict | None, list[str]]:
+    """Who hears about the family's likes and comments: the feed's admin emails (the owner, if they asked for
+    it), and the co-parents unless they switched it off. -> the feed's setup-page settings (None for a feed in
+    feeds.yml, where co-parents can't switch anything off, so they aren't emailed), and the addresses."""
+    raw = core.store.get(feed.id)
+    quiet = set(raw.get("quiet_comments", [])) if raw else set()
+    coparents = [m.email for m in feed.others() if feed.is_coparent(m) and m.id not in quiet] if raw else []
+    return raw, list(dict.fromkeys(clean_email(a) for a in [*feed.cfg.admin_emails, *coparents]))
+
+
+def _family_email(feed: Feed, raw: dict | None, address: str) -> tuple[str, str, dict]:
+    """What each email to the family needs: -> the person's language, a link token that signs them in on
+    the website (when they're in the album), and the footer's part of the template context."""
+    s = core.settings
+    member = feed.by_email(address)
+    lang = (member and core.languages.get(member.id)) or s.default_language
+    signed_in = member is not None and member.email != feed.cfg.bot_email
+    token = make_token(s, feed.id, "u", member.id) if signed_in else ""
+    owner = address in {clean_email(a) for a in feed.cfg.admin_emails}
+    # The owner switches these off in the settings; a co-parent, who has none, right from the email.
+    footer = {
+        "settings_url": f"{s.public_url}/setup/f/{feed.id}" if raw and owner else "",
+        "off_url": f"{s.public_url}/{feed.id}/comment-emails?{urlencode({'t': token})}" if signed_in and not owner else "",
+        "name": member.name if signed_in else "",
+        "link_days": s.link_days,
+    }
+    return lang, token, footer
+
+
+async def tell_about_comment(viewer: Viewer, asset_id: str, body: str, path: str, what: str | None,
+                             trip: str | None = None, day: str | None = None) -> None:
+    """Emails the family a new comment right away, so they can answer while it's fresh: the photo, and a
+    link that signs them in on the website when they're in the album, so they can reply in their own name."""
     feed, s = viewer.feed, core.settings
     who = viewer.name or "Someone"
     commenter = viewer.account.email if viewer.account and not viewer.is_guest else None
-    raw = core.store.get(feed.id)  # co-parents can switch these off only on feeds set up on the setup page
-    quiet = set(raw.get("quiet_comments", [])) if raw else set()
-    coparents = [m.email for m in feed.others() if feed.is_coparent(m) and m.id not in quiet] if raw else []
-    to = [a for a in dict.fromkeys(clean_email(a) for a in [*feed.cfg.admin_emails, *coparents]) if a != commenter]
+    raw, to = _family_addresses(feed)
+    to = [a for a in to if a != commenter]
     if not (to and s.smtp_host):
         return
     try:
@@ -507,24 +535,65 @@ async def tell_about_comment(viewer: Viewer, asset_id: str, body: str, path: str
     except Exception:
         log.warning("Feed %s: no picture of %s for a comment email", feed.id, asset_id)
         image = None
-    admins = {clean_email(a) for a in feed.cfg.admin_emails}
     for address in to:
-        member = feed.by_email(address)
-        lang = (member and core.languages.get(member.id)) or s.default_language
-        signed_in = member is not None and member.email != feed.cfg.bot_email
-        token = make_token(s, feed.id, "u", member.id) if signed_in else ""
-        # The owner switches these off in the settings; a co-parent, who has none, right from the email.
-        settings_url = f"{s.public_url}/setup/f/{feed.id}" if raw and address in admins else ""
-        off_url = (f"{s.public_url}/{feed.id}/comment-emails?{urlencode({'t': token})}"
-                   if signed_in and address not in admins else "")
-        ctx = {"who": who, "body": body, "what": what or "", "settings_url": settings_url, "off_url": off_url,
-               "link_days": s.link_days,
-               "url": f"{s.public_url}{path}" + (f"?{urlencode({'t': token})}" if token else ""),
-               "name": member.name if signed_in else ""}
+        lang, token, footer = _family_email(feed, raw, address)
+        ctx = {**footer, "who": who, "body": body, "trip": trip,
+               "what": what or (nice_date(day, lang) if day else ""),
+               "url": f"{s.public_url}{path}" + (f"?{urlencode({'t': token})}" if token else "")}
         try:
             await mailer.send(s, mailer.build_comment(feed.cfg, address, lang, ctx, image))
         except Exception:
             log.exception("Could not email feed %s's family about a comment", feed.id)
+
+
+LIKES_HOURS = 24  # the likes email runs once a day and covers the day before it
+
+
+def _liked(feed: Feed, activities: list[dict], since: dt.datetime) -> list[tuple[str, list[dict]]]:
+    """The likes since `since` on photos the feed shares: -> (photo, its likes), the first liked first."""
+    photos: dict[str, list[dict]] = {}
+    for a in activities:
+        if a["type"] == "like" and feed.library.get(a.get("assetId") or "") is not None \
+                and dt.datetime.fromisoformat(a["createdAt"].replace("Z", "+00:00")) > since:
+            photos.setdefault(a["assetId"], []).append(a)
+    return list(photos.items())
+
+
+async def tell_about_likes(feed: Feed) -> None:
+    """Emails the family the day's likes in one go, half a day after the daily email went out: every photo
+    that got some, and who liked it. Unlike comments, likes don't need an answer, so they can wait and come
+    together. Nobody hears about their own likes; nothing new, no email."""
+    s = core.settings
+    raw, to = _family_addresses(feed)
+    if not (to and s.smtp_host):
+        return
+    since = dt.datetime.now(dt.timezone.utc) - dt.timedelta(hours=LIKES_HOURS)
+    liked = _liked(feed, await feed.activities(), since)
+    images: dict[str, bytes] = {}
+    for address in to:
+        mine = lambda a: clean_email(a["user"].get("email") or "") == address  # noqa: E731
+        photos = [(asset_id, names) for asset_id, likes in liked
+                  if (names := list(dict.fromkeys(core.people.display_name(a["user"]["name"]) for a in likes
+                                                  if not mine(a))))]
+        if not photos:
+            continue
+        for asset_id, _ in photos:
+            if asset_id not in images:
+                try:
+                    images[asset_id] = await core.media.jpeg(feed.curator, asset_id, "thumb")
+                except Exception:
+                    log.warning("Feed %s: no picture of %s for a likes email", feed.id, asset_id)
+                    images[asset_id] = b""
+        lang, token, footer = _family_email(feed, raw, address)
+        query = f"?{urlencode({'t': token})}" if token else ""
+        ctx = {**footer, "photos": [
+            {"asset_id": asset_id, "names": names, "url": f"{s.public_url}/{feed.id}/e/{asset_id}{query}",
+             "what": feed.library.get(asset_id).caption or nice_date(feed.library.get(asset_id).taken_at, lang)}
+            for asset_id, names in photos]}
+        try:
+            await mailer.send(s, mailer.build_likes(feed.cfg, address, lang, ctx, images))
+        except Exception:
+            log.exception("Could not email feed %s's family about likes", feed.id)
 
 
 # --- unsubscribe (one-click capable, RFC 8058) — stored as the member's Immich email preference ---
@@ -569,13 +638,13 @@ async def comment_emails_confirm(request: Request, feed_id: str, t: str = ""):
 
 @app.post("/{feed_id}/comment-emails", response_class=HTMLResponse)
 async def comment_emails_off(request: Request, feed_id: str, t: str = ""):
-    """A co-parent stops the emails about comments (they have no settings page to do it on)."""
+    """A co-parent stops the emails about comments and likes (they have no settings page to do it on)."""
     feed, member, raw = _coparent_for_comment_emails(feed_id, t)
     quiet = raw.setdefault("quiet_comments", [])
     if member.id not in quiet:
         quiet.append(member.id)
         core.store.save(raw)
-    return message_page(request, "Unsubscribed", "You won't get emails about new comments anymore.", feed=feed)
+    return message_page(request, "Unsubscribed", "You won't get emails about comments and likes anymore.", feed=feed)
 
 
 # --- expired links and "Not you?" ---------------------------------------------

@@ -176,3 +176,65 @@ def test_a_co_parent_who_cant_comment_yet_is_told_how(client, home, monkeypatch)
     client.get("/setup/f/falks/open")
     r = client.post(f"/falks/e/{PHOTO}/comment", data={"body": "Hallo"})
     assert r.status_code == 503 and "ask for a new invite link" in r.text
+
+
+def like(asset_id, who, hours_ago):
+    when = web.dt.datetime.now(web.dt.timezone.utc) - web.dt.timedelta(hours=hours_ago)
+    return {"id": f"like-{who.id}-{asset_id}", "type": "like", "assetId": asset_id, "createdAt": when.isoformat(),
+            "user": {"id": who.id, "name": who.name, "email": who.email}}
+
+
+def test_the_days_likes_come_in_one_email_to_the_family(home, family, settings, oma):
+    async def activities():
+        return [like(PHOTO, oma, 3), like(PHOTO, papa, 2), like(PHOTO, mama, 1),
+                like(PHOTO, oma, 30) | {"id": "yesterday"},   # from before: already told
+                like("not-shared", oma, 1)]                   # not a photo of the feed
+    home.feed.activities = activities
+    asyncio.run(web.tell_about_likes(home.feed))
+    to_mama, to_papa = family.sent
+    assert to_mama["To"] == mama.email and to_mama["Subject"] == "Die Falks: New likes"
+    html = to_mama.get_body(("html",)).get_content()
+    assert "Kürbisse schnitzen" in html and "Oma Erika, Papa" in html and "Mama" not in html.split("Kürbisse")[1].split("</a>")[0]
+    link = html.split(f'href="http://testserver/falks/e/{PHOTO}?t=')[1].split('"')[0]
+    assert links.read_token(settings, link).ident == mama.id  # opens the photo signed in as Mama
+    assert "cid:" in html and "Switch it off in the settings" in html
+    text = to_papa.get_body(("plain",)).get_content()
+    assert "Oma Erika, Mama" in text and "Papa," not in text and "Stop these emails" in text
+
+
+def test_no_likes_or_only_ones_own_mean_no_email(home, family):
+    async def only_mamas():
+        return [like(PHOTO, mama, 1)]
+    home.feed.activities = only_mamas
+    asyncio.run(web.tell_about_likes(home.feed))
+    assert [m["To"] for m in family.sent] == [papa.email]  # Mama isn't told about her own like
+    family.sent.clear()
+
+    async def nothing():
+        return []
+    home.feed.activities = nothing
+    asyncio.run(web.tell_about_likes(home.feed))
+    assert family.sent == []
+
+
+def test_co_parents_who_stopped_comment_emails_dont_get_likes_either(home, family, oma):
+    web.core.store.get("falks")["quiet_comments"] = [papa.id]
+
+    async def activities():
+        return [like(PHOTO, oma, 1)]
+    home.feed.activities = activities
+    asyncio.run(web.tell_about_likes(home.feed))
+    assert [m["To"] for m in family.sent] == [mama.email]
+
+
+def test_the_likes_email_goes_out_half_a_day_after_the_daily_one():
+    from mail_a_patatina.core import Core
+
+    jobs = []
+    core = Core.__new__(Core)
+    core.settings = NS(sync_minutes=10)
+    core.scheduler = NS(add_job=lambda func, trigger=None, **kw: jobs.append((kw["id"], str(trigger))))
+    core.likes_job = web.tell_about_likes
+    core.schedule(NS(id="falks", cfg=NS(send_time="07:30", timezone="Europe/Berlin"), sync=None, dispatch=None))
+    likes = dict(jobs)["likes-falks"]
+    assert "hour='19'" in likes and "minute='30'" in likes
