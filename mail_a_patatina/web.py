@@ -698,14 +698,32 @@ async def tell_about_comment(viewer: Viewer, asset_id: str, body: str, path: str
 LIKES_HOURS = 24  # the likes email runs once a day and covers the day before it
 
 
-def _liked(feed: Feed, activities: list[dict], since: dt.datetime) -> list[tuple[str, list[dict]]]:
-    """The likes since `since` on photos the feed shares: -> (photo, its likes), the first liked first."""
+@dataclass
+class Liked:
+    """A photo liked lately, as the likes email lists it."""
+    asset_id: str
+    likes: list[dict]
+    path: str  # its page on the website
+    caption: str
+    day: str  # when it was taken, for photos without a caption
+
+
+def _recent_likes(activities: list[dict], since: dt.datetime) -> dict[str, list[dict]]:
+    """The likes since `since`, by photo, the first liked first."""
     photos: dict[str, list[dict]] = {}
     for a in activities:
-        if a["type"] == "like" and feed.library.get(a.get("assetId") or "") is not None \
-                and dt.datetime.fromisoformat(a["createdAt"].replace("Z", "+00:00")) > since:
-            photos.setdefault(a["assetId"], []).append(a)
-    return list(photos.items())
+        if a["type"] == "like" and dt.datetime.fromisoformat(a["createdAt"].replace("Z", "+00:00")) > since:
+            photos.setdefault(a.get("assetId") or "", []).append(a)
+    return photos
+
+
+async def _liked(feed: Feed, since: dt.datetime) -> list[Liked]:
+    """The feed's photos liked since `since`."""
+    out = []
+    for asset_id, likes in _recent_likes(await feed.activities(), since).items():
+        if (entry := feed.library.get(asset_id)) is not None:
+            out.append(Liked(asset_id, likes, f"/{feed.id}/e/{asset_id}", entry.caption, entry.taken_at))
+    return out
 
 
 async def tell_about_likes(feed: Feed) -> None:
@@ -716,29 +734,28 @@ async def tell_about_likes(feed: Feed) -> None:
     raw, to = _family_addresses(feed)
     if not (to and s.smtp_host):
         return
-    since = dt.datetime.now(dt.timezone.utc) - dt.timedelta(hours=LIKES_HOURS)
-    liked = _liked(feed, await feed.activities(), since)
+    liked = await _liked(feed, dt.datetime.now(dt.timezone.utc) - dt.timedelta(hours=LIKES_HOURS))
     images: dict[str, bytes] = {}
     for address in to:
         mine = lambda a: clean_email(a["user"].get("email") or "") == address  # noqa: E731
-        photos = [(asset_id, names) for asset_id, likes in liked
-                  if (names := list(dict.fromkeys(core.people.display_name(a["user"]["name"]) for a in likes
+        photos = [(item, names) for item in liked
+                  if (names := list(dict.fromkeys(core.people.display_name(a["user"]["name"]) for a in item.likes
                                                   if not mine(a))))]
         if not photos:
             continue
-        for asset_id, _ in photos:
-            if asset_id not in images:
+        for item, _ in photos:
+            if item.asset_id not in images:
                 try:
-                    images[asset_id] = await core.media.jpeg(feed.curator, asset_id, "thumb")
+                    images[item.asset_id] = await core.media.jpeg(feed.curator, item.asset_id, "thumb")
                 except Exception:
-                    log.warning("Feed %s: no picture of %s for a likes email", feed.id, asset_id)
-                    images[asset_id] = b""
+                    log.warning("Feed %s: no picture of %s for a likes email", feed.id, item.asset_id)
+                    images[item.asset_id] = b""
         lang, token, footer = _family_email(feed, raw, address)
         query = f"?{urlencode({'t': token})}" if token else ""
         ctx = {**footer, "photos": [
-            {"asset_id": asset_id, "names": names, "url": f"{s.public_url}/{feed.id}/e/{asset_id}{query}",
-             "what": feed.library.get(asset_id).caption or nice_date(feed.library.get(asset_id).taken_at, lang)}
-            for asset_id, names in photos]}
+            {"asset_id": item.asset_id, "names": names, "url": f"{s.public_url}{item.path}{query}",
+             "what": item.caption or nice_date(item.day, lang)}
+            for item, names in photos]}
         try:
             await mailer.send(s, mailer.build_likes(feed.cfg, address, lang, ctx, images))
         except Exception:
