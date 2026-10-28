@@ -481,7 +481,7 @@ async def delete_comment(request: Request, feed_id: str, activity_id: str):
 async def media(request: Request, feed_id: str, asset_id: str, size: str):
     feed = require_viewer(request, feed_id).feed
     shared_entry(feed, asset_id)
-    if size not in ("thumb", "preview"):
+    if size not in ("thumb", "preview", "large"):
         raise HTTPException(404)
     data = await core.media.jpeg(feed.curator, asset_id, size)
     return Response(data, media_type="image/jpeg", headers={"Cache-Control": "private, max-age=86400"})
@@ -633,7 +633,7 @@ async def trip_media_file(request: Request, feed_id: str, slug: str, post_slug: 
     viewer, _, _, media = trip_media(request, feed_id, slug, post_slug, asset_id)
     if size == "video":
         return await _stream_video(request, viewer.feed, media)
-    if size not in ("thumb", "preview"):
+    if size not in ("thumb", "preview", "large"):
         raise HTTPException(404)
     data = await core.media.jpeg(viewer.feed.curator, asset_id, size)
     return Response(data, media_type="image/jpeg", headers={"Cache-Control": "private, max-age=86400"})

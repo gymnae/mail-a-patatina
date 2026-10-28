@@ -4,23 +4,31 @@ from __future__ import annotations
 
 import asyncio
 import io
+import logging
 from collections import defaultdict
 from pathlib import Path
 
-from PIL import Image
+from PIL import Image, ImageOps
 
 from .immich import Immich
 
-# our size name -> (Immich rendition, longest edge in px)
-SIZES = {"thumb": ("thumbnail", 480), "preview": ("preview", 1600)}
+log = logging.getLogger(__name__)
+
+# our size name -> (Immich rendition, longest edge in px). "large" is for zooming in on a photo's own page, made
+# from the full-size picture (needs Immich 1.127 or later); where there's none, it's the preview after all.
+SIZES = {"thumb": ("thumbnail", 480), "preview": ("preview", 1600), "large": ("fullsize", 2560)}
 
 
 def _to_jpeg(raw: bytes, max_edge: int) -> bytes:
     with Image.open(io.BytesIO(raw)) as img:
-        img = img.convert("RGB")
+        img.draft("RGB", (max_edge, max_edge))  # a big original JPEG decodes at a fraction of its size, much faster
+        icc = img.info.get("icc_profile")
+        # Originals may still be lying on their side, with a note saying so; what's saved carries none of their
+        # notes (no places or cameras), only the colour profile.
+        img = ImageOps.exif_transpose(img).convert("RGB")
         img.thumbnail((max_edge, max_edge))
         out = io.BytesIO()
-        img.save(out, "JPEG", quality=85, optimize=True, progressive=True)
+        img.save(out, "JPEG", quality=85, optimize=True, progressive=True, icc_profile=icc)
         return out.getvalue()
 
 
@@ -37,8 +45,16 @@ class MediaCache:
         async with self._locks[path.name]:
             if path.exists():
                 return path.read_bytes()
-            raw = await immich.thumbnail(asset_id, immich_size)
-            data = await asyncio.to_thread(_to_jpeg, raw, max_edge)
+            try:
+                raw = await immich.thumbnail(asset_id, immich_size)
+                data = await asyncio.to_thread(_to_jpeg, raw, max_edge)
+            except Exception:
+                if size != "large":
+                    raise
+                # An older Immich, or an original we can't read (HEIC): the preview will do.
+                log.info("no full-size picture of %s, using the preview", asset_id, exc_info=True)
+                raw = await immich.thumbnail(asset_id, "preview")
+                data = await asyncio.to_thread(_to_jpeg, raw, max_edge)
             tmp = path.with_suffix(".tmp")
             tmp.write_bytes(data)
             tmp.replace(path)
