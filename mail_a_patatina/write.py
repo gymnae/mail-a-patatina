@@ -447,8 +447,8 @@ async def photo(request: Request, feed_id: str, asset_id: str, size: str = "thum
     _, _, feed, _ = writer(request, feed_id)
     if not journal.ASSET_ID.match(asset_id) or size not in ("thumb", "preview"):
         raise HTTPException(404)
-    data = await core(request).media.jpeg(feed.curator, asset_id, size)
-    return Response(data, media_type="image/jpeg", headers={"Cache-Control": "private, max-age=86400"})
+    data, kind = await core(request).media.web(feed.curator, asset_id, size)
+    return Response(data, media_type=kind, headers={"Cache-Control": "private, max-age=86400"})
 
 
 # Texts the editor's script shows, translated on the page.

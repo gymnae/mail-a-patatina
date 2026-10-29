@@ -5,6 +5,5 @@ markdown-it-py==3.0.0
 python-multipart==0.0.20
 httpx==0.28.1
 pillow==11.2.1
-pillow-heif==1.8.1
 pyyaml==6.0.2
 apscheduler==3.11.0
