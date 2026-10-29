@@ -17,10 +17,10 @@ log = logging.getLogger(__name__)
 
 # For emails: our size name -> (Immich rendition, longest edge in px)
 SIZES = {"thumb": ("thumbnail", 480), "preview": ("preview", 1600)}
-# For the website: our size name -> Immich rendition. "large" is what Immich's own viewer loads when zooming in:
+# For the website: our size name -> Immich rendition. "full" is what Immich's own viewer loads when zooming in:
 # the original of a photo browsers can show, else the full-size picture Immich made of it (of a HEIC or RAW, if
 # Immich is set to make those), else the preview.
-WEB = {"thumb": "thumbnail", "preview": "preview", "large": "fullsize"}
+WEB = {"thumb": "thumbnail", "preview": "preview"}
 SHOWN = {"JPEG", "PNG", "WEBP", "GIF"}  # what browsers show
 ORIENTATION = 0x0112
 APP1, APP2, APP14, COM, SOS, EOI = 0xE1, 0xE2, 0xEE, 0xFE, 0xDA, 0xD9
@@ -118,14 +118,17 @@ class MediaCache:
 
     async def web(self, immich: Immich, asset_id: str, size: str) -> tuple[bytes, str]:
         """For the website: -> the picture and its media type. Same rules for `immich` as for jpeg()."""
-        if size == "large":  # many megabytes, and only wanted by whoever zooms in: the browser keeps it
+        if size == "full":  # many megabytes, and only wanted by whoever zooms in: the browser keeps it
             try:
-                raw = await immich.thumbnail(asset_id, WEB[size])
+                raw, source = await immich.full_size(asset_id)
             except Exception as e:
                 # An older Immich, or a curator's API key that may not download originals.
                 log.warning("no full-size picture of %s (%s), using the preview", asset_id, e)
                 return await self.web(immich, asset_id, "preview")
-            return await asyncio.to_thread(_for_browsers, raw)
+            data, kind = await asyncio.to_thread(_for_browsers, raw)
+            with Image.open(io.BytesIO(data)) as img:
+                log.info("zooming in on %s: Immich's %s, %d×%d", asset_id, source, *img.size)
+            return data, kind
         path = self.root / f"{asset_id}-{size}.web"
         async with self._locks[path.name]:
             if path.exists():

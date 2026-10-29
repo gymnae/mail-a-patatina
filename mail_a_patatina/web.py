@@ -453,7 +453,7 @@ async def delete_comment(request: Request, feed_id: str, activity_id: str):
 async def media(request: Request, feed_id: str, asset_id: str, size: str):
     feed = require_viewer(request, feed_id).feed
     shared_entry(feed, asset_id)
-    if size not in ("thumb", "preview", "large"):
+    if size not in ("thumb", "preview", "full"):
         raise HTTPException(404)
     data, kind = await core.media.web(feed.curator, asset_id, size)
     return Response(data, media_type=kind, headers={"Cache-Control": "private, max-age=86400"})
