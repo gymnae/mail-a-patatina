@@ -455,8 +455,8 @@ async def media(request: Request, feed_id: str, asset_id: str, size: str):
     shared_entry(feed, asset_id)
     if size not in ("thumb", "preview", "large"):
         raise HTTPException(404)
-    data = await core.media.jpeg(feed.curator, asset_id, size)
-    return Response(data, media_type="image/jpeg", headers={"Cache-Control": "private, max-age=86400"})
+    data, kind = await core.media.web(feed.curator, asset_id, size)
+    return Response(data, media_type=kind, headers={"Cache-Control": "private, max-age=86400"})
 
 
 @app.get("/{feed_id}/p/{asset_id}/{ticket}.jpg")

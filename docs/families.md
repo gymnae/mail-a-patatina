@@ -3,7 +3,7 @@
 Everyone who can sign in to Immich can set up their own family feed at `PUBLIC_URL/setup/`, with no help from the admin:
 
 1. **Sign in** with your identity provider (e.g. Pocket ID), the same account as for Immich.
-2. **Connect Immich:** if Immich signs in through OAuth, one button: people sign in to Immich as usual, and the page creates the key with exactly the right permissions (see [Pocket ID](hosting.md#pocket-id-or-any-oidc-provider)). Otherwise, or as a fallback, the page links to Immich's API-key screen and lists the eight permissions to tick. Either way the key is checked:
+2. **Connect Immich:** if Immich signs in through OAuth, one button: people sign in to Immich as usual, and the page creates the key with exactly the right permissions (see [Pocket ID](hosting.md#pocket-id-or-any-oidc-provider)). Otherwise, or as a fallback, the page links to Immich's API-key screen and lists the permissions to tick. Either way the key is checked:
    - it must belong to the same email address,
    - it must have exactly what the feed needs,
    - it must not be able to administer Immich or delete anything, except take people out of the album (`albumUser.delete`).

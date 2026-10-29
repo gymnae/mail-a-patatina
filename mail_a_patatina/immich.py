@@ -22,9 +22,10 @@ ACTIVITY_PERMISSIONS = ["activity.create", "activity.read", "activity.delete"]
 RELATIVE_PERMISSIONS = [*ACTIVITY_PERMISSIONS, "user.read", "userPreference.read", "userPreference.update"]
 KEY_NAME = "mail-a-patatina"
 # What the album owner's key needs (entered on the setup page). Besides activity.delete, the only delete
-# right is albumUser.delete, which takes someone out of the album (never photos or accounts).
+# right is albumUser.delete, which takes someone out of the album (never photos or accounts). asset.download
+# is for zooming in: Immich's full-size picture of a JPEG is the original.
 OWNER_PERMISSIONS = [
-    "album.read", "asset.read", "asset.view", "asset.update", *ACTIVITY_PERMISSIONS, "user.read",
+    "album.read", "asset.read", "asset.view", "asset.download", "asset.update", *ACTIVITY_PERMISSIONS, "user.read",
     "albumUser.create", "albumUser.delete",
 ]
 # What a co-parent's key needs: record deliveries on their own photos (only an asset's owner may), and
@@ -155,11 +156,6 @@ class Immich:
     async def thumbnail(self, asset_id: str, size: str) -> bytes:
         # "fullsize" of a photo browsers can show is the original itself, which Immich answers with a redirect.
         r = await self.http.get(f"/assets/{asset_id}/thumbnail", params={"size": size}, follow_redirects=True)
-        r.raise_for_status()
-        return r.content
-
-    async def original(self, asset_id: str) -> bytes:
-        r = await self.http.get(f"/assets/{asset_id}/original")
         r.raise_for_status()
         return r.content
 

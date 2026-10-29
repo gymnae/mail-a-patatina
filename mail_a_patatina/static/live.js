@@ -49,6 +49,17 @@ if (document.body.classList.contains("protect")) {
 // lies a small lens showing the patch the loupe shows; the loupe itself floats just above it, or beside it where
 // there's no room above, and glides over when it changes sides. Both show the same picture the page does, so
 // there's nothing new to save. (Fingers zoom the photo itself instead, like in a photos app: see below.)
+// The page shows Immich's preview. Looking closer, with the loupe or the fingers, loads the full picture in the
+// background, as Immich's own viewer does when zooming in, and swaps it in once it's ready.
+const sharpen = (img) => {
+  const url = img.dataset.large;
+  if (!url) return;
+  delete img.dataset.large;
+  const large = new Image();
+  large.src = url;
+  large.decode().then(() => { img.src = url; }).catch(() => {});
+};
+
 for (const figure of document.querySelectorAll(".zoomable")) {
   const img = figure.querySelector("img");
   const loupe = document.createElement("div");
@@ -64,16 +75,7 @@ for (const figure of document.querySelectorAll(".zoomable")) {
   let side = null;   // where the loupe rests: "above", "left" or "right"
   let glide = 0;
   let pixels = null; // the photo's pixels for the lens, once loaded; false where the browser won't hand them out
-
-  // The page shows the preview right away, then swaps in a sharper picture for looking closer once it's loaded.
-  if (img.dataset.large) {
-    const large = new Image();
-    large.onload = () => {
-      img.src = large.src;
-      pixels = null;
-    };
-    large.src = img.dataset.large;
-  }
+  img.addEventListener("load", () => { pixels = null; });  // the full picture came in
 
   // The lens bends the photo like a glass lying on it: most magnified in the middle, bunching up towards the
   // rim, where the colours drift apart a little. Its rim shows exactly the patch the loupe shows.
@@ -81,11 +83,13 @@ for (const figure of document.querySelectorAll(".zoomable")) {
     if (pixels === null) {
       if (!img.complete || !img.naturalWidth) return false;  // not loaded yet: try again next time
       try {
+        // An original can have 50 million pixels; a few million are plenty under a lens.
+        const fit = Math.min(1, 4096 / Math.max(img.naturalWidth, img.naturalHeight));
         const c = document.createElement("canvas");
-        c.width = img.naturalWidth;
-        c.height = img.naturalHeight;
+        c.width = Math.round(img.naturalWidth * fit);
+        c.height = Math.round(img.naturalHeight * fit);
         const g = c.getContext("2d", { willReadFrequently: true });
-        g.drawImage(img, 0, 0);
+        g.drawImage(img, 0, 0, c.width, c.height);
         pixels = { data: g.getImageData(0, 0, c.width, c.height).data, w: c.width, h: c.height };
       } catch {
         pixels = false;
@@ -137,7 +141,8 @@ for (const figure of document.querySelectorAll(".zoomable")) {
   const toggle = (value) => {
     on = value;
     figure.classList.toggle("zooming", on);
-    if (!on) hide();
+    if (on) sharpen(img);
+    else hide();
   };
   const draw = () => {
     frame = 0;
@@ -149,8 +154,8 @@ for (const figure of document.querySelectorAll(".zoomable")) {
     const appearing = loupe.hidden;
     loupe.hidden = lens.hidden = false;
 
-    // The loupe: at least the picture's own sharpness, and never less than 2.5 times what's on screen.
-    const zoom = Math.max(2.5, img.naturalWidth / r.width || 0);
+    // The loupe: three times what's on screen, the same before and after the full picture comes in.
+    const zoom = 3;
     const size = loupe.offsetWidth;
     loupe.style.backgroundImage = src;
     loupe.style.backgroundSize = `${r.width * zoom}px ${r.height * zoom}px`;
@@ -245,9 +250,10 @@ for (const figure of document.querySelectorAll(".zoomable")) {
     photo.classList.toggle("settling", smooth);
     photo.style.transform = s === 1 ? "" : `translate3d(${tx}px, ${ty}px, 0) scale(${s})`;
     figure.classList.toggle("zoomed", s > 1);
+    if (s > 1) sharpen(img);
   };
-  // As far as photo apps go: well past the picture's own sharpness, and at least four times.
-  const most = () => Math.max(4, (2 * img.naturalWidth) / photo.offsetWidth || 0);
+  // As far as photo apps go: ten times.
+  const most = 10;
   // Where a finger is, on the photo as it lies unzoomed.
   const at = (t) => {
     const r = photo.getBoundingClientRect();
@@ -282,7 +288,7 @@ for (const figure of document.querySelectorAll(".zoomable")) {
     if (e.touches.length < 2 && scale === 1) return;  // one finger on the photo at normal size: the page scrolls
     e.preventDefault();
     let s = scale;
-    if (e.touches.length >= 2 && start.d) s = Math.min(most(), Math.max(1, (start.scale * m.d) / start.d));
+    if (e.touches.length >= 2 && start.d) s = Math.min(most, Math.max(1, (start.scale * m.d) / start.d));
     // The spot that was between the fingers stays between them.
     const ux = (start.x - start.tx) / start.scale;
     const uy = (start.y - start.ty) / start.scale;
@@ -299,7 +305,7 @@ for (const figure of document.querySelectorAll(".zoomable")) {
       e.preventDefault();  // no click after it
       if (scale > 1) return set(1, 0, 0, true);
       const p = at(t);
-      const s = Math.min(most(), Math.max(2.5, img.naturalWidth / photo.offsetWidth || 0));
+      const s = 3;
       return set(s, p.x * (1 - s), p.y * (1 - s), true);
     }
     tap = { time: now, x: t.clientX, y: t.clientY };

@@ -25,7 +25,7 @@ Mail-A-Patatina only **transports, presents and collects**. It has no database: 
 | Families, chats, SMTP, schedule | Configuration: `.env` and `config/feeds.yml` or `config/chats.yml` |
 | The relatives' API keys | Credentials: `./secrets/relatives.yml`, next to `.env` |
 
-`./data` only holds a cache of resized JPEGs and each relative's last browser language, and is safe to delete. Restarting or rebuilding the container loses nothing.
+`./data` only holds a cache of pictures (Immich's own previews for the website, JPEGs for emails) and each relative's last browser language, and is safe to delete. Restarting or rebuilding the container loses nothing.
 
 ## Sharing a moment
 

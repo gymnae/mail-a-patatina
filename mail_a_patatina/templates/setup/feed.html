@@ -7,7 +7,7 @@
 
 {% if owner_missing %}
 <div class="notice error" role="alert">
-  <p>Mail-A-Patatina needs more permissions from your Immich key, so that you can like and comment on the feed in your own name: {% for p in owner_missing %}<code>{{ p }}</code> {% endfor %}</p>
+  <p>Mail-A-Patatina needs more permissions from your Immich key, so that you can like and comment on the feed in your own name{% if "asset.download" in owner_missing %}, and everyone can zoom in on the photos sharply{% endif %}: {% for p in owner_missing %}<code>{{ p }}</code> {% endfor %}</p>
   {% if immich_oauth %}
   <form method="post" action="/setup/immich/connect">
     <input type="hidden" name="csrf" value="{{ session.csrf }}"><input type="hidden" name="feed_id" value="{{ raw.id }}">
