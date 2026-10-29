@@ -236,19 +236,39 @@ for (const figure of document.querySelectorAll(".zoomable")) {
   let scale = 1;
   let tx = 0;
   let ty = 0;
+  let w = 0;         // the photo's size unzoomed
+  let h = 0;
   let start = null;  // the zoom and fingers when the current gesture began
   let tap = null;    // the last quick tap, to tell a double tap
   let moved = false;
 
-  const set = (s, x, y, smooth = false) => {
-    const w = photo.offsetWidth;
-    const h = photo.offsetHeight;
+  // While pinched or gliding, the photo is scaled, which is smooth; but phones then stretch the picture as they
+  // drew it at normal size, blurry. At rest it's laid out at its zoomed size instead, so they draw it anew from
+  // the full picture, as sharp as in Immich.
+  const draw = (sized) => {
+    photo.style.width = sized ? `${w * scale}px` : "";
+    photo.style.maxWidth = sized ? "none" : "";
+    photo.style.transform = scale === 1 ? "" : `translate(${tx}px, ${ty}px)${sized ? "" : ` scale(${scale})`}`;
+  };
+  // how: "rest", "pinch" (following the fingers) or "glide" (a double tap's smooth zoom)
+  const set = (s, x, y, how = "rest") => {
+    if (scale === 1) {
+      w = photo.offsetWidth;
+      h = photo.offsetHeight;
+    }
+    if (how === "glide") {
+      // Glide from the same picture, scaled.
+      photo.classList.remove("settling");
+      draw(false);
+      void photo.offsetWidth;
+    }
     scale = s;
     // The photo always fills its frame: no empty space past its edges.
     tx = Math.min(0, Math.max(w - w * s, x));
     ty = Math.min(0, Math.max(h - h * s, y));
-    photo.classList.toggle("settling", smooth);
-    photo.style.transform = s === 1 ? "" : `translate3d(${tx}px, ${ty}px, 0) scale(${s})`;
+    photo.classList.toggle("settling", how === "glide");
+    figure.style.height = s > 1 ? `${h}px` : "";  // the frame stays as it was, whatever the photo's size
+    draw(how === "rest" && s > 1);
     figure.classList.toggle("zoomed", s > 1);
     if (s > 1) sharpen(img);
   };
@@ -271,12 +291,21 @@ for (const figure of document.querySelectorAll(".zoomable")) {
 
   // Safari's own pinch would zoom the whole page instead.
   figure.addEventListener("gesturestart", (e) => e.preventDefault());
+  // A gesture that starts on the photo is followed everywhere: a finger that came down beside the photo, or
+  // lifted last, tells only the page.
+  const follow = (on) => {
+    const listen = on ? addEventListener : removeEventListener;
+    listen("touchmove", move, { passive: false });
+    listen("touchend", end);
+    listen("touchcancel", cancel);
+  };
   figure.addEventListener("touchstart", (e) => {
     if (e.touches.length === 1) moved = false;
     else moved = true;  // a second finger: a pinch, not a tap
+    if (!start) follow(true);
     begin(e);
   }, { passive: true });
-  figure.addEventListener("touchmove", (e) => {
+  const move = (e) => {
     if (!start) return;
     // A second finger that came down beside the photo told only the page: start over from both fingers.
     if (e.touches.length !== start.n) {
@@ -292,26 +321,35 @@ for (const figure of document.querySelectorAll(".zoomable")) {
     // The spot that was between the fingers stays between them.
     const ux = (start.x - start.tx) / start.scale;
     const uy = (start.y - start.ty) / start.scale;
-    set(s, m.x - ux * s, m.y - uy * s);
-  }, { passive: false });
-  figure.addEventListener("touchend", (e) => {
+    set(s, m.x - ux * s, m.y - uy * s, e.touches.length >= 2 ? "pinch" : "rest");
+  };
+  const end = (e) => {
     if (e.touches.length) return begin(e);  // one of two fingers lifted: carry on with the other
     start = null;
+    follow(false);
+    if (scale > 1 && !photo.classList.contains("settling")) draw(true);  // a pinch ended: draw it sharp
     if (moved || e.changedTouches.length !== 1) return (tap = null);
     const t = e.changedTouches[0];
     const now = Date.now();
     if (tap && now - tap.time < 350 && Math.hypot(t.clientX - tap.x, t.clientY - tap.y) < 40) {
       tap = null;
       e.preventDefault();  // no click after it
-      if (scale > 1) return set(1, 0, 0, true);
+      if (scale > 1) return set(1, 0, 0, "glide");
       const p = at(t);
       const s = 3;
-      return set(s, p.x * (1 - s), p.y * (1 - s), true);
+      return set(s, p.x * (1 - s), p.y * (1 - s), "glide");
     }
     tap = { time: now, x: t.clientX, y: t.clientY };
+  };
+  const cancel = () => {
+    start = null;
+    follow(false);
+    if (scale > 1 && !photo.classList.contains("settling")) draw(true);
+  };
+  photo.addEventListener("transitionend", () => {
+    photo.classList.remove("settling");
+    if (scale > 1) draw(true);
   });
-  figure.addEventListener("touchcancel", () => { start = null; });
-  photo.addEventListener("transitionend", () => photo.classList.remove("settling"));
   // A new size of the page (turning the phone) starts over at normal size.
   window.addEventListener("resize", () => { if (scale > 1) set(1, 0, 0); });
 }

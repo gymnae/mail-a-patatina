@@ -85,6 +85,7 @@ def _for_browsers(raw: bytes) -> tuple[bytes, str]:
         return _without_notes(raw, orientation), "image/jpeg"
     if kind in SHOWN and not noted:
         return raw, Image.MIME[kind]
+    log.info("a %s with notes or one browsers can't show: made anew as a JPEG", kind)
     return _to_jpeg(raw, 8192, quality=92), "image/jpeg"
 
 
