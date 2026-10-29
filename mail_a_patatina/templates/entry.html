@@ -8,12 +8,12 @@
     <video controls playsinline preload="none"{% if protect %} controlslist="nodownload"{% endif %} poster="{{ src }}/preview" src="{{ video_src }}"></video>
     {% elif entry.live_video_id %}
     <div class="live">
-      <img src="{{ src }}/preview" data-large="{{ src }}/large" alt="{{ entry.caption }}">
+      <img src="{{ src }}/preview" data-full="{{ src }}/full" alt="{{ entry.caption }}">
       <video muted playsinline loop preload="none" src="{{ video_src }}" aria-hidden="true"></video>
       <span class="live-badge">LIVE</span>
     </div>
     {% else %}
-    <img src="{{ src }}/preview" data-large="{{ src }}/large" alt="{{ entry.caption }}">
+    <img src="{{ src }}/preview" data-full="{{ src }}/full" alt="{{ entry.caption }}">
     {% endif %}
   </figure>
   <p class="date">{{ entry.taken_at | nice_date }}</p>

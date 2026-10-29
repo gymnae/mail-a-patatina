@@ -178,10 +178,17 @@ class Immich:
         return assets["items"], nxt
 
     async def thumbnail(self, asset_id: str, size: str) -> bytes:
-        # "fullsize" of a photo browsers can show is the original itself, which Immich answers with a redirect.
-        r = await self.http.get(f"/assets/{asset_id}/thumbnail", params={"size": size}, follow_redirects=True)
+        r = await self.http.get(f"/assets/{asset_id}/thumbnail", params={"size": size})
         r.raise_for_status()
         return r.content
+
+    async def full_size(self, asset_id: str) -> tuple[bytes, str]:
+        """What Immich's own viewer shows when zooming in. -> the picture, and which one Immich chose: "original"
+        (of a photo browsers can show), "fullsize" (the one it made of a HEIC or RAW) or "preview" (if it made
+        none). Immich answers the first and the last with a redirect."""
+        r = await self.http.get(f"/assets/{asset_id}/thumbnail", params={"size": "fullsize"}, follow_redirects=True)
+        r.raise_for_status()
+        return r.content, "original" if r.url.path.endswith("/original") else r.url.params.get("size", "fullsize")
 
     async def open_video(self, asset_id: str, range_header: str | None) -> httpx.Response:
         """Start streaming a video; the caller must close the response."""

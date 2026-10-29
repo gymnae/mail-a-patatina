@@ -3,8 +3,10 @@
 import asyncio
 import io
 
+import httpx
 from PIL import Image, ImageCms
 
+from mail_a_patatina.immich import Immich as ImmichClient
 from mail_a_patatina.media import MediaCache
 
 GPS = 0x8825
@@ -39,6 +41,9 @@ class Immich:
             raise RuntimeError(f"no {size}")
         return self.renditions[size]
 
+    async def full_size(self, asset_id):
+        return await self.thumbnail(asset_id, "fullsize"), "original"
+
 
 def web(tmp_path, immich, size, asset_id="a1"):
     return asyncio.run(MediaCache(tmp_path).web(immich, asset_id, size))
@@ -65,7 +70,7 @@ def test_zooming_in_shows_the_original_unchanged_but_without_its_notes(tmp_path)
     srgb = ImageCms.ImageCmsProfile(ImageCms.createProfile("sRGB")).tobytes()
     extra = photo(100, 100, notes=True)
     original = photo(400, 300, orientation=6, notes=True, icc_profile=srgb, progressive=True) + extra
-    data, kind = web(tmp_path, Immich(fullsize=original), "large")
+    data, kind = web(tmp_path, Immich(fullsize=original), "full")
     assert kind == "image/jpeg"
     with Image.open(io.BytesIO(data)) as img, Image.open(io.BytesIO(original)) as before:
         assert img.tobytes() == before.tobytes()  # not one pixel changed
@@ -79,12 +84,12 @@ def test_zooming_in_shows_the_original_unchanged_but_without_its_notes(tmp_path)
 def test_zooming_in_without_a_full_size_picture_shows_the_preview(tmp_path):
     preview = photo(1440, 1080, "WEBP")
     immich = Immich(fullsize=None, preview=preview)  # an older Immich, or a key that may not download
-    assert web(tmp_path, immich, "large") == (preview, "image/webp")
+    assert web(tmp_path, immich, "full") == (preview, "image/webp")
     assert immich.asked == ["fullsize", "preview"]
 
 
 def test_other_pictures_with_notes_are_made_anew_without_them(tmp_path):
-    data, kind = web(tmp_path, Immich(fullsize=photo(400, 300, "WEBP", orientation=6, notes=True)), "large")
+    data, kind = web(tmp_path, Immich(fullsize=photo(400, 300, "WEBP", orientation=6, notes=True)), "full")
     with Image.open(io.BytesIO(data)) as img:
         assert (kind, img.size) == ("image/jpeg", (300, 400))  # turned upright
         assert not img.getexif()
@@ -95,3 +100,25 @@ def test_big_pictures_made_by_earlier_versions_are_cleared_away(tmp_path):
         (tmp_path / name).write_bytes(b"a picture")
     MediaCache(tmp_path)
     assert sorted(p.name for p in tmp_path.iterdir()) == ["a1-preview.jpg"]
+
+
+def test_immich_tells_which_picture_it_gave_for_zooming_in():
+    # As Immich answers: a JPEG's full size is its original, a HEIC's the one Immich made, or else its preview.
+    def answer(request):
+        assert request.headers["x-api-key"] == "key"  # still sent after a redirect
+        path, size = request.url.path, request.url.params.get("size")
+        if path == "/api/assets/jpeg/thumbnail" and size == "fullsize":
+            return httpx.Response(302, headers={"Location": "original?"})
+        if path == "/api/assets/plain-heic/thumbnail" and size == "fullsize":
+            return httpx.Response(302, headers={"Location": "/api/assets/plain-heic/thumbnail?size=preview"})
+        return httpx.Response(200, content=f"{path} {size}".encode())
+
+    async def ask(asset_id):
+        immich = ImmichClient("http://immich", api_key="key")
+        immich.http = httpx.AsyncClient(base_url="http://immich/api", headers=immich.http.headers,
+                                        transport=httpx.MockTransport(answer))
+        return await immich.full_size(asset_id)
+
+    assert asyncio.run(ask("jpeg")) == (b"/api/assets/jpeg/original None", "original")
+    assert asyncio.run(ask("heic")) == (b"/api/assets/heic/thumbnail fullsize", "fullsize")
+    assert asyncio.run(ask("plain-heic")) == (b"/api/assets/plain-heic/thumbnail preview", "preview")

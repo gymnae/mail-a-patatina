@@ -52,12 +52,12 @@ if (document.body.classList.contains("protect")) {
 // The page shows Immich's preview. Looking closer, with the loupe or the fingers, loads the full picture in the
 // background, as Immich's own viewer does when zooming in, and swaps it in once it's ready.
 const sharpen = (img) => {
-  const url = img.dataset.large;
+  const url = img.dataset.full;
   if (!url) return;
-  delete img.dataset.large;
-  const large = new Image();
-  large.src = url;
-  large.decode().then(() => { img.src = url; }).catch(() => {});
+  delete img.dataset.full;
+  const full = new Image();
+  full.src = url;
+  full.decode().then(() => { img.src = url; }).catch(() => {});
 };
 
 for (const figure of document.querySelectorAll(".zoomable")) {
